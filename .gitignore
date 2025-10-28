@@ -1,0 +1,6 @@
+.env
+iac/environment-variables/** 
+.obsidian/
+venv/
+
+wip/**

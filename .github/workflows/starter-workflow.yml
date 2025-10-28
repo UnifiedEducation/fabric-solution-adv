@@ -1,0 +1,28 @@
+name: Starter GitHub Actions Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      solution_version:
+        description: "Solution version (e.g., av01, av02, av03)"
+        required: true
+        type: string
+        default: "av01"
+
+jobs:
+  deploy-fabric-infrastructure:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install pip & Fabric CLI
+        run: |
+            python -m pip install --upgrade pip
+            pip install ms-fabric-cli==1.2.0
+
+      - name: Authenticate
+        run: |
+            fab auth login -u ${{secrets.SPN_CLIENT_ID}} -p ${{secrets.SPN_CLIENT_SECRET}} --tenant ${{secrets.AZURE_TENANT_ID}}
