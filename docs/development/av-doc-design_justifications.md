@@ -1,6 +1,6 @@
 > ℹ️ This document provides justification for architectural decisions, in response to PRJ101 ⬛ Capacity & Workspace Design (Sprint 1), as part of the Advanced-Level Fabric Project, in [Fabric Dojo](https://skool.com/fabricdojo/about).
 
-## Specifics on how the design meets each specific client requirement
+# Sprint 1 Design Decisions
 
 #### Infrastructure-as-Code
 
@@ -38,7 +38,7 @@
 
 - The design accounts for 9 separate workspaces, to separate Processing, Data Stores, and Consumption workloads, through three different Deployment stages (DEV, TEST and PROD) - this results in 9 workspaces in total. These workspaces will be created as part of the IAC deployment template.
 - The high-level architecture diagram does not include ephemeral, "feature" workspaces, which will be created for development of new features. The creation of these workspaces will be done through a GitHub Action automation, to be described in more detail, in the next Sprint.
-
+- As the client wishes to implement [Microsoft CICD Option 1](https://learn.microsoft.com/en-us/fabric/cicd/manage-deployment#option-1---git--based-deployments), each of the nine core workspaces will be connected to a folder in the Git repository, across three separate branches (DEV, TEST and PROD). A two-way sync will be implemented between the Git repository and the Workspaces, using GitHub Actions. Promotion of content between stages will be managed through GitHub pull requests only.
 
 #### Access
 
@@ -53,41 +53,7 @@
 
 > **[RB008] The client has requested a solid naming convention strategy for: capacities, workspaces, deployment pipelines.**
 
-The following naming conventions have been suggested for client review, based on the items found in the High-Level Architecture Diagram are described below:
+For the naming convention, I've created a separate part of the documentation for it, as it will likely be developed further in the future. 
 
-The general naming convention is described below:
-AA_BB_CC_DD
-AA = Item Type
-BB = Project Code
-CC = Deployment Stage
-DD = Short Description
 
-Part 1: Item Types:
 
-- FC: Fabric Capacity
-- WS: Workspace
-- SG: Entra ID Security Group
-- _More will be added to this list as we progress the project & implementation_
-
-Part 2: Project Code:
-
-- AV01: AV - related to the Advanced-level project. 01 - relates to the Architectural version number of the IAC template that deployed the solution.
-- AV02: therefore, AV02 will be solution deployed from a second IAC template (as part of the Adv). The second version of the architecture.
-- It is assumed the two-digit number code (giving room for 99 architecture versions), will be sufficient 'headroom' in the naming convention, but this will be confirmed with the client.
-
-Part 3: Deployment Stage:
-
-- DEV: Development stage
-- TEST: Test stage
-- PROD: Production stage
-- _Note: the deployment stage is optional, and only needs to be applied if the item goes through a deployment process. For example, in our architecture Security Groups will not be deployed, and so do not need a Deployment Stage in the name_
-
-Part 4: Short Description:
-
-- One or two word description to give people a better idea about the item.
-
-Some examples, including their plain language description:
-
-- **SG_INT_Analysts** - Entra ID Security Group, for the INT project, for Analysts
-- **fcav01devengineering** - a Fabric Capacity, for the Advanced project (first Version), for use in Data Engineering-related workspaces, at the DEV deployment stage. Note: Fabric Capacities must be lower-case and not contain hyphens, so they are somewhat of an exception to the overall rule.
-- **WS_AV01_TEST_Processing** - a Fabric Workspace, for the Advanced project (V01 of the Architecture), TEST Deployment stage, and inside will be Processing items.
