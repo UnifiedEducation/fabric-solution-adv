@@ -17,6 +17,10 @@ from string import Template
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Ensure UTF-8 encoding for stdout to support Unicode characters (like checkmarks)
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+
 
 def get_fabric_cli_path():
     """Get the path to the Fabric CLI executable."""
