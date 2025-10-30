@@ -56,4 +56,15 @@
 For the naming convention, I've created a separate part of the documentation for it, as it will likely be developed further in the future. 
 
 
+## Sprint 2 updates & decisions
+
+> The following decisions made during Sprint 2, which impact the design, architecture or naming convention. 
+
+- Changed the naming convention slightly - I went with all lower-case (so that the Capacities names match the rest of the infrastructure), also switched to using hyphens, rather than underscores to keep in alignment with Azure infrastructure.
+    
+- I have further developed the CI/CD strategy, and updated the brief to reflect the changes.
+    
+- I've updated the high-level architecture diagram to reflect these changes.
+
+
 
