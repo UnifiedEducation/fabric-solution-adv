@@ -2,5 +2,4 @@
 iac/environment-variables/** 
 .obsidian/
 venv/
-
 wip/**
