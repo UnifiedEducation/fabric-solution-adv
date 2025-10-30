@@ -56,7 +56,7 @@
 For the naming convention, I've created a separate part of the documentation for it, as it will likely be developed further in the future. 
 
 
-## Sprint 2 updates & decisions
+# Sprint 2 Design Decisions & Changes
 
 > The following decisions made during Sprint 2, which impact the design, architecture or naming convention. 
 
