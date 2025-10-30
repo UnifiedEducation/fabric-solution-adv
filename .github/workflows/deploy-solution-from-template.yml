@@ -21,7 +21,7 @@ jobs:
       - name: Install pip & Fabric CLI
         run: |
           python -m pip install --upgrade pip
-          pip install ms-fabric-cli==1.2.0 python-dotenv
+          pip install -r config/requirements.txt
 
       - name: Run solution generator
         run: |
