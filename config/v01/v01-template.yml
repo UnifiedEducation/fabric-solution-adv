@@ -26,7 +26,7 @@ azure:
 
 github:
   organization: "UnifiedEducation"
-  repository: "fabric-solution-adv-PRIVATE"
+  repository: "fabric-solution-adv"
   branch: "main"
   provider: "GitHub"
 

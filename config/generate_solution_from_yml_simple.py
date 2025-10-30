@@ -92,7 +92,7 @@ def create_capacity(capacity_config, subscription_id, resource_group, defaults):
 
     if status in [200, 201]:
         print(f"✓ Created {capacity_name}")
-        time.sleep(30)
+        time.sleep(40)
 
 
 def workspace_exists(workspace_name):
