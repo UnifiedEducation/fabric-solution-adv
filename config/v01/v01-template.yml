@@ -1,1 +1,97 @@
-# Template file to be further developed here
+# Fabric Solution Configuration Template
+# This template represents a Fabric solution, in YAML.
+# We'll be expanding this template as move through the project!
+
+# Solution Version - important! This will be injected into all resource names (e.g., av01, av02, av03)
+solution_version: "av01"
+
+# Azure Configuration
+azure:
+  subscription_id: "${AZURE_SUBSCRIPTION_ID}" # Set via environment variable
+  tenant_id: "${AZURE_TENANT_ID}" # Set via environment variable
+
+  # Entra ID Security Groups (Object IDs) - for workspace permissions
+  # Replace these with your actual Entra ID Group Object IDs
+  security_groups:
+    SG_AV_Analysts: "b433d103-7e1a-4551-89f9-cab0bdaec1b7"
+    SG_AV_Engineers: "cb57ea63-9bb9-47f0-bffe-c5610aeba46c"
+    SG_AV_Consumers: "64ce5f2b-e9ab-417a-90ed-a76029623ea8"
+
+  # Default settings for all Fabric capacities, saves us having to right them out each time
+  capacity_defaults:
+    resource_group: "rg-av01" # Azure Resource Group for all capacities
+    region: "uksouth"
+    sku: "F2"
+    capacity_admins: "${SPN_OBJECT_ID}" # Capacity administrators loaded from environment variable (comma-separated Object IDs)
+
+github:
+  organization: "UnifiedEducation"
+  repository: "fabric-solution-adv-PRIVATE"
+  branch: "main"
+  provider: "GitHub"
+
+# Fabric Capacities
+capacities:
+  - name: "fc{{SOLUTION_VERSION}}devengineering"
+  - name: "fc{{SOLUTION_VERSION}}testengineering"
+  - name: "fc{{SOLUTION_VERSION}}prodengineering"
+  - name: "fc{{SOLUTION_VERSION}}devconsumption"
+  - name: "fc{{SOLUTION_VERSION}}testconsumption"
+  - name: "fc{{SOLUTION_VERSION}}prodconsumption"
+
+# Fabric Workspaces
+workspaces:
+  - name: "{{SOLUTION_VERSION}}-dev-processing"
+    capacity: "fc{{SOLUTION_VERSION}}devengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+    connect_to_git_folder: "solution/processing/"
+  - name: "{{SOLUTION_VERSION}}-dev-datastores"
+    capacity: "fc{{SOLUTION_VERSION}}devengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+    connect_to_git_folder: "solution/datastores/"
+  - name: "{{SOLUTION_VERSION}}-dev-consumption"
+    capacity: "fc{{SOLUTION_VERSION}}devengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+    connect_to_git_folder: "solution/consumption/"
+  - name: "{{SOLUTION_VERSION}}-test-processing"
+    capacity: "fc{{SOLUTION_VERSION}}testengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+  - name: "{{SOLUTION_VERSION}}-test-datastores"
+    capacity: "fc{{SOLUTION_VERSION}}testengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+  - name: "{{SOLUTION_VERSION}}-test-consumption"
+    capacity: "fc{{SOLUTION_VERSION}}testconsumption"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+  - name: "{{SOLUTION_VERSION}}-prod-processing"
+    capacity: "fc{{SOLUTION_VERSION}}prodengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+  - name: "{{SOLUTION_VERSION}}-prod-datastores"
+    capacity: "fc{{SOLUTION_VERSION}}prodengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+      - group: "SG_AV_Analysts"
+        role: "Contributor"
+  - name: "{{SOLUTION_VERSION}}-prod-consumption"
+    capacity: "fc{{SOLUTION_VERSION}}prodconsumption"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+      - group: "SG_AV_Analysts"
+        role: "Contributor"
+      - group: "SG_AV_Consumers"
+        role: "Viewer"
