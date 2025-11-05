@@ -78,8 +78,30 @@ def update_workspace_from_git(workspace_id, workspace_name):
 
     try:
         status_json = json.loads(status_response.stdout)
-        if status_json.get('status_code') != 200:
-            print(f"  ⚠ Failed to get Git status: {status_json.get('status_code')}")
+        status_code = status_json.get('status_code')
+
+        # Handle uninitialized connection
+        if status_code == 400:
+            error_text = status_json.get('text', {})
+            if error_text.get('errorCode') == 'WorkspaceGitConnectionNotInitialized':
+                print(f"  → Initializing Git connection")
+                run_command([
+                    get_fabric_cli_path(), 'api', '-X', 'post',
+                    f'workspaces/{workspace_id}/git/initializeConnection',
+                    '-i', '{}'
+                ])
+                # Retry getting status after initialization
+                status_response = run_command([
+                    get_fabric_cli_path(), 'api', '-X', 'get',
+                    f'workspaces/{workspace_id}/git/status'
+                ])
+                status_json = json.loads(status_response.stdout)
+                status_code = status_json.get('status_code')
+
+        if status_code != 200:
+            error_text = status_json.get('text', {})
+            print(f"  ⚠ Failed to get Git status: {status_code}")
+            print(f"     Error: {error_text}")
             return False
 
         remote_commit_hash = status_json.get('text', {}).get('remoteCommitHash')
