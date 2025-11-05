@@ -25,10 +25,10 @@ azure:
     capacity_admins: "${SPN_OBJECT_ID}" # Capacity administrators loaded from environment variable (comma-separated Object IDs)
 
 github:
-  organization: "UnifiedEducation" 
-  repository: "fabric-solution-adv-PRIVATE" 
-  branch: "main" 
-  provider: "GitHub" 
+  organization: "UnifiedEducation"
+  repository: "fabric-solution-adv"
+  branch: "main"
+  provider: "GitHub"
 
 # Fabric Capacities
 capacities:

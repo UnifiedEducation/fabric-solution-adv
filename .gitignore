@@ -3,3 +3,5 @@ iac/environment-variables/**
 .obsidian/
 venv/
 wip/**
+.claude/
+*.pyc
