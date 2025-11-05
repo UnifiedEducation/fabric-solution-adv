@@ -57,6 +57,45 @@ def get_or_create_git_connection(workspace_id, git_config):
     return None
 
 
+def update_workspace_from_git(workspace_id, workspace_name):
+    """
+    Update workspace content from Git (pull from Git).
+
+    This syncs the Git repository content into the workspace.
+    """
+    update_request = {
+        "remoteCommitHash": None,  # Use latest
+        "conflictResolution": {
+            "conflictResolutionType": "Workspace",
+            "conflictResolutionPolicy": "PreferWorkspace"
+        },
+        "options": {
+            "allowOverrideItems": True
+        }
+    }
+
+    update_response = run_command([
+        get_fabric_cli_path(), 'api', '-X', 'post',
+        f'workspaces/{workspace_id}/git/updateFromGit',
+        '-i', json.dumps(update_request)
+    ])
+
+    if not update_response.stdout.strip():
+        print(f"  ⚠ Update from Git returned empty response")
+        return True
+
+    try:
+        response_json = json.loads(update_response.stdout)
+        if response_json.get('status_code') in [200, 201, 202]:
+            print(f"  ✓ Updated {workspace_name} from Git")
+            return True
+    except json.JSONDecodeError:
+        pass
+
+    print(f"  ⚠ Update from Git may have failed")
+    return False
+
+
 def connect_workspace_to_git(workspace_id, workspace_name, directory_name, git_config, connection_id):
     """
     Connect a Fabric workspace to a Git repository.
@@ -103,7 +142,8 @@ def connect_workspace_to_git(workspace_id, workspace_name, directory_name, git_c
         return False
 
     if connect_json.get('status_code') in [200, 201]:
-        print(f"✓ Connected {workspace_name} to Git: {git_config.get('branch')}/{directory_name}")
+        print(
+            f"✓ Connected {workspace_name} to Git: {git_config.get('branch')}/{directory_name}")
         return True
 
     print(f"✗ Failed to connect {workspace_name} to Git")

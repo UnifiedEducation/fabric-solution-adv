@@ -5,6 +5,8 @@ This script is designed to be called from GitHub Actions workflow_dispatch.
 It creates workspaces for a feature branch and connects them to Git.
 """
 
+# fmt: off
+# isort: skip_file
 import os
 import sys
 from pathlib import Path
@@ -15,10 +17,13 @@ config_dir = Path(__file__).parent.parent
 if str(config_dir) not in sys.path:
     sys.path.insert(0, str(config_dir))
 
-# Import from fabric_core modules
+# Import from fabric_core modules (must be after sys.path modification)
 from fabric_core import auth, create_workspace, assign_permissions
-from fabric_core import get_or_create_git_connection, connect_workspace_to_git
-from fabric_core.utils import load_config
+from fabric_core import get_or_create_git_connection, connect_workspace_to_git, update_workspace_from_git
+from fabric_core.utils import load_config, run_command, get_fabric_cli_path
+import json
+# fmt: on
+
 
 # Ensure UTF-8 encoding for stdout
 if sys.stdout.encoding != 'utf-8':
@@ -43,10 +48,12 @@ def main():
 
     # Get inputs from environment (set by GitHub Actions workflow)
     feature_branch = os.getenv('FEATURE_BRANCH_NAME')
-    workspaces_input = os.getenv('WORKSPACES_TO_CREATE', 'processing,datastores')
+    workspaces_input = os.getenv(
+        'WORKSPACES_TO_CREATE', 'processing,datastores')
 
     # Parse workspace types (comma-separated)
-    workspace_types = [ws.strip() for ws in workspaces_input.split(',') if ws.strip()]
+    workspace_types = [ws.strip()
+                       for ws in workspaces_input.split(',') if ws.strip()]
 
     # Load config to get solution version, security groups, and git config
     config = load_config(
@@ -65,7 +72,8 @@ def main():
         print("\n✗ Authentication failed. Cannot proceed with workspace creation.")
         return
 
-    print(f"\n=== CREATING FEATURE WORKSPACES FOR BRANCH: {feature_branch} ===")
+    print(
+        f"\n=== CREATING FEATURE WORKSPACES FOR BRANCH: {feature_branch} ===")
     github_connection_id = None
 
     for workspace_type in workspace_types:
@@ -73,7 +81,8 @@ def main():
         workspace_name = f"{solution_version}-{feature_branch}-{workspace_type}"
 
         # Get capacity for this workspace type
-        capacity_name = get_capacity_for_workspace_type(workspace_type, solution_version)
+        capacity_name = get_capacity_for_workspace_type(
+            workspace_type, solution_version)
 
         if not capacity_name:
             print(f"✗ Unknown workspace type: {workspace_type}")
@@ -90,22 +99,35 @@ def main():
 
         if workspace_id:
             # Assign Engineers as Contributors
-            permissions = [{'group': 'SG_AV_Engineers', 'role': 'Contributor'}]
+            permissions = [{'group': 'SG_AV_Engineers', 'role': 'Admin'}]
             assign_permissions(workspace_id, permissions, security_groups)
 
             # Connect to Git (feature branch, solution/<type>/ folder)
             if not github_connection_id:
-                github_connection_id = get_or_create_git_connection(workspace_id, git_config)
+                github_connection_id = get_or_create_git_connection(
+                    workspace_id, git_config)
 
             if github_connection_id:
                 git_directory = f"solution/{workspace_type}/"
-                connect_workspace_to_git(
+                success = connect_workspace_to_git(
                     workspace_id,
                     workspace_name,
                     git_directory,
                     git_config,
                     github_connection_id
                 )
+
+                if success:
+                    # Initialize the connection
+                    init_response = run_command([
+                        get_fabric_cli_path(), 'api', '-X', 'post',
+                        f'workspaces/{workspace_id}/git/initializeConnection',
+                        '-i', '{}'
+                    ])
+                    print(f"  ✓ Initialized Git connection")
+
+                    # Pull content from Git into the workspace
+                    update_workspace_from_git(workspace_id, workspace_name)
 
     print("\n✓ Feature workspace creation complete")
 
