@@ -1,0 +1,53 @@
+# ============================================================================
+# Fabric Solution Configuration Template
+# ============================================================================
+# This template defines all resources for a complete Fabric solution.
+# Everything is self-contained - no CLI parameters needed.
+
+# Solution Version ID
+# This will be injected into all resource names (e.g., AV01, AV02, AV03)
+solution_version: "AV0X"
+
+# Azure Configuration
+azure:
+  subscription_id: "${AZURE_SUBSCRIPTION_ID}" # Set via environment variable
+  tenant_id: "${AZURE_TENANT_ID}" # Set via environment variable
+
+  # Entra ID Security Groups (Object IDs)
+  # Replace these with your actual Entra ID Group Object IDs
+  security_groups:
+    SG_AV_Analysts: "00000000-0000-0000-0000-000000000001"
+    SG_AV_Engineers: "00000000-0000-0000-0000-000000000002"
+    SG_AV_Consumers: "00000000-0000-0000-0000-000000000003"
+
+  # Default settings for all Fabric capacities
+  capacity_defaults:
+    resource_group: "rg-fabric-avXX" # Azure Resource Group for all capacities
+    region: "uksouth"
+    sku: "F2"
+    admin_group: "SG_AV_Engineers" # Entra ID Security Group for capacity administrators
+
+# Fabric Capacities
+capacities:
+  - name: "fc{{SOLUTION_VERSION}}devengineering"
+  - name: "fc{{SOLUTION_VERSION}}testengineering"
+  - name: "fc{{SOLUTION_VERSION}}prodengineering"
+  - name: "fc{{SOLUTION_VERSION}}devconsumption"
+  - name: "fc{{SOLUTION_VERSION}}testconsumption"
+  - name: "fc{{SOLUTION_VERSION}}prodconsumption"
+
+# Fabric Workspaces
+workspaces:
+  - name: "{{SOLUTION_VERSION}}-dev-processing"
+    description: "For pipelines, code and config, DEV stage"
+    capacity: "fc{{SOLUTION_VERSION}}devengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
+
+  - name: "{{SOLUTION_VERSION}}-dev-datastores"
+    description: "For data stores, DEV stage"
+    capacity: "fc{{SOLUTION_VERSION}}devengineering"
+    permissions:
+      - group: "SG_AV_Engineers"
+        role: "Admin"
