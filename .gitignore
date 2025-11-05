@@ -5,3 +5,5 @@ venv/
 wip/**
 .claude/
 *.pyc
+config/**.pyc
+/config/fabric_core/__pycache__

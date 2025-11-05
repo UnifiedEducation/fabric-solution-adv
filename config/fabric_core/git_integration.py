@@ -20,8 +20,8 @@ def get_or_create_git_connection(workspace_id, git_config):
     repo_name = git_config.get('repository')
     connection_name = f"GitHub-{owner_name}-{repo_name}"
 
-    list_response = run_command(
-        [get_fabric_cli_path(), 'api', '-X', 'get', 'connections'])
+    # Check for existing connection
+    list_response = run_command([get_fabric_cli_path(), 'api', '-X', 'get', 'connections'])
     list_json = json.loads(list_response.stdout)
 
     if list_json.get('status_code') == 200:
@@ -31,6 +31,7 @@ def get_or_create_git_connection(workspace_id, git_config):
                 print(f"✓ Using existing connection: {connection_name}")
                 return conn.get('id')
 
+    # Create new connection
     github_url = f"https://github.com/{owner_name}/{repo_name}"
     request_body = {
         "connectivityType": "ShareableCloud",
@@ -45,8 +46,10 @@ def get_or_create_git_connection(workspace_id, git_config):
         }
     }
 
-    create_response = run_command([get_fabric_cli_path(
-    ), 'api', '-X', 'post', 'connections', '-i', json.dumps(request_body)])
+    create_response = run_command([
+        get_fabric_cli_path(), 'api', '-X', 'post', 'connections',
+        '-i', json.dumps(request_body)
+    ])
     create_json = json.loads(create_response.stdout)
 
     if create_json.get('status_code') in [200, 201]:
@@ -63,15 +66,38 @@ def update_workspace_from_git(workspace_id, workspace_name):
 
     This syncs the Git repository content into the workspace.
     """
+    # Get Git status to retrieve remoteCommitHash
+    status_response = run_command([
+        get_fabric_cli_path(), 'api', '-X', 'get',
+        f'workspaces/{workspace_id}/git/status'
+    ])
+
+    if not status_response.stdout.strip():
+        print(f"  ⚠ Failed to get Git status")
+        return False
+
+    try:
+        status_json = json.loads(status_response.stdout)
+        if status_json.get('status_code') != 200:
+            print(f"  ⚠ Failed to get Git status: {status_json.get('status_code')}")
+            return False
+
+        remote_commit_hash = status_json.get('text', {}).get('remoteCommitHash')
+        if not remote_commit_hash:
+            print(f"  ⚠ No remoteCommitHash found in status")
+            return False
+    except json.JSONDecodeError:
+        print(f"  ⚠ Failed to parse Git status")
+        return False
+
+    # Update from Git using the remoteCommitHash
     update_request = {
-        "remoteCommitHash": None,  # Use latest
+        "remoteCommitHash": remote_commit_hash,
         "conflictResolution": {
             "conflictResolutionType": "Workspace",
             "conflictResolutionPolicy": "PreferWorkspace"
         },
-        "options": {
-            "allowOverrideItems": True
-        }
+        "options": {"allowOverrideItems": True}
     }
 
     update_response = run_command([
@@ -81,8 +107,7 @@ def update_workspace_from_git(workspace_id, workspace_name):
     ])
 
     if not update_response.stdout.strip():
-        print(f"  ⚠ Update from Git returned empty response")
-        return True
+        return True  # Empty response is acceptable
 
     try:
         response_json = json.loads(update_response.stdout)
@@ -110,6 +135,25 @@ def connect_workspace_to_git(workspace_id, workspace_name, directory_name, git_c
     Returns:
         bool: True if successful, False otherwise
     """
+    # Check if workspace is already connected to Git
+    status_response = run_command([
+        get_fabric_cli_path(), 'api', '-X', 'get',
+        f'workspaces/{workspace_id}/git/status'
+    ])
+
+    if status_response.stdout.strip():
+        try:
+            status_json = json.loads(status_response.stdout)
+            if status_json.get('status_code') == 200:
+                git_status = status_json.get('text', {})
+                # Check for connection indicators (either field means already connected)
+                if git_status.get('gitConnectionState') or git_status.get('remoteCommitHash'):
+                    print(f"✓ {workspace_name} already connected to Git")
+                    return True
+        except json.JSONDecodeError:
+            pass  # Continue with connection attempt if parsing fails
+
+    # Connect workspace to Git
     request_body = {
         "gitProviderDetails": {
             "ownerName": git_config.get('organization'),
@@ -124,26 +168,24 @@ def connect_workspace_to_git(workspace_id, workspace_name, directory_name, git_c
         }
     }
 
-    connect_response = run_command([get_fabric_cli_path(), 'api', '-X', 'post', f'workspaces/{workspace_id}/git/connect',
-                                    '-i', json.dumps(request_body)])
+    connect_response = run_command([
+        get_fabric_cli_path(), 'api', '-X', 'post',
+        f'workspaces/{workspace_id}/git/connect',
+        '-i', json.dumps(request_body)
+    ])
 
-    # Handle empty or invalid JSON response
     if not connect_response.stdout.strip():
         print(f"✗ Failed to connect {workspace_name} to Git: Empty response")
-        print(f"  stderr: {connect_response.stderr}")
         return False
 
     try:
         connect_json = json.loads(connect_response.stdout)
     except json.JSONDecodeError:
         print(f"✗ Failed to connect {workspace_name} to Git: Invalid JSON")
-        print(f"  stdout: {connect_response.stdout}")
-        print(f"  stderr: {connect_response.stderr}")
         return False
 
     if connect_json.get('status_code') in [200, 201]:
-        print(
-            f"✓ Connected {workspace_name} to Git: {git_config.get('branch')}/{directory_name}")
+        print(f"✓ Connected {workspace_name} to Git: {git_config.get('branch')}/{directory_name}")
         return True
 
     print(f"✗ Failed to connect {workspace_name} to Git")
