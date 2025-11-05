@@ -1,0 +1,51 @@
+name: Create Feature Workspaces
+
+on:
+  workflow_dispatch:
+    inputs:
+      feature_branch_name:
+        description: "Feature branch name (e.g., feature_new-api)"
+        required: true
+        type: string
+      workspaces_to_be_created:
+        description: "Workspaces types (comma-separated: processing,datastores,consumption)"
+        required: true
+        type: string
+        default: "processing,datastores"
+
+jobs:
+  create-feature-workspaces:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create and push feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b ${{ inputs.feature_branch_name }}
+          git push -u origin ${{ inputs.feature_branch_name }}
+
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pip & requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r config/requirements.txt
+
+      - name: Create feature workspaces
+        env:
+          FEATURE_BRANCH_NAME: ${{ inputs.feature_branch_name }}
+          WORKSPACES_TO_CREATE: ${{ inputs.workspaces_to_be_created }}
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          GITHUB_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/create_feature_workspaces.py
