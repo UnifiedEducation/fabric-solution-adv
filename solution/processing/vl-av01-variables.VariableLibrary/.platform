@@ -1,11 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
-    "type": "Lakehouse",
-    "displayName": "lh_av01_cicd_test"
+    "type": "VariableLibrary",
+    "displayName": "vl-av01-variables"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "e4b1b0db-6bff-974c-48c5-bb43db2383b6"
+    "logicalId": "8c78e853-f3f6-b797-4da9-da409983fd07"
   }
 }

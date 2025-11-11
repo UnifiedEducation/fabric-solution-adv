@@ -1,0 +1,29 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/variables/1.0.0/schema.json",
+  "variables": [
+    {
+      "name": "LH_WORKSPACE_NAME",
+      "note": "",
+      "type": "String",
+      "value": "av01-feature-sprint4-youtubeapi-datastores"
+    },
+    {
+      "name": "BRONZE_LH_NAME",
+      "note": "",
+      "type": "String",
+      "value": "lh_av01_bronze"
+    },
+    {
+      "name": "SILVER_LH_NAME",
+      "note": "",
+      "type": "String",
+      "value": "lh_av01_silver"
+    },
+    {
+      "name": "GOLD_LH_NAME",
+      "note": "",
+      "type": "String",
+      "value": "lh_av01_gold"
+    }
+  ]
+}
