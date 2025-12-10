@@ -51,5 +51,8 @@ jobs:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           GITHUB_PAT: ${{ secrets.GH_PAT }}
           GITHUB_ACTIONS: true
+          PYTHONUTF8: 1
+          PYTHONIOENCODING: utf-8
         run: |
+          chcp 65001
           python config/scripts/create_feature_workspaces.py

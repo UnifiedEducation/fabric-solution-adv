@@ -26,7 +26,6 @@ jobs:
       - name: Run solution generator
         run: |
           python config/generate_solution_from_yml_simple.py
-        shell: bash
         working-directory: ${{ github.workspace }}
         env:
           CONFIG_FILE: ${{ github.event.inputs.config_file }}
@@ -36,3 +35,5 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           GITHUB_PAT: ${{ secrets.GH_PAT }}
+          PYTHONUTF8: 1
+          PYTHONIOENCODING: utf-8
