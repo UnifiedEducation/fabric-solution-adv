@@ -1,0 +1,6 @@
+CREATE USER [william@fabric.courses]
+    WITH SID = 0x774DBE0F22C8244594EC72DAFADEC83E, TYPE = E;
+
+
+GO
+
