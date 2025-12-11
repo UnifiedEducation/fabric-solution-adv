@@ -387,15 +387,16 @@ def dedupe_by_window(df, partition_cols: list, order_col: str, order_desc: bool 
 
 def rename_columns(df, column_mapping: dict, **ctx):
     """
-    Rename columns according to mapping.
+    Rename columns according to mapping, preserving all other columns.
     
     Corresponds to: metadata.transform_store.function_name = 'rename_columns'
     Expected params: {"column_mapping": {"old_name": "new_name", ...}}
     """
-    select_exprs = []
+    result_df = df
     for old_name, new_name in column_mapping.items():
-        select_exprs.append(F.col(old_name).alias(new_name))
-    return df.select(*select_exprs)
+        result_df = result_df.withColumnRenamed(old_name, new_name)
+    return result_df
+
 
 
 def add_literal_columns(df, columns: dict, **ctx):
@@ -412,27 +413,76 @@ def add_literal_columns(df, columns: dict, **ctx):
 
 
 def generate_surrogate_key(df, key_column_name: str, order_by_col: str,
-                           max_from_table: str = None, **ctx):
+                           natural_key: str = None, max_from_table: str = None, **ctx):
     """
-    Generate surrogate key using row_number + max existing ID.
-    
+    Generate surrogate key for new records only, preserving existing keys.
+
     Corresponds to: metadata.transform_store.function_name = 'generate_surrogate_key'
-    Expected params: {"key_column_name": "...", "order_by_col": "...", "max_from_table": "..."}
+    Expected params: {"key_column_name": "...", "order_by_col": "...", "natural_key": "...", "max_from_table": "..."}
+
+    Args:
+        key_column_name: Name of surrogate key column to create
+        order_by_col: Column to order by when assigning new keys
+        natural_key: Column that identifies unique records (e.g., 'asset_natural_id')
+                    If provided, looks up existing surrogate IDs from target
+        max_from_table: Target table path to get max existing ID and existing mappings
+
+    Note: max_from_table is a relative table name (e.g., 'marketing/assets').
+    The full path is built using dest_base_path from ctx.
     """
     spark = ctx.get("spark")
+    dest_base_path = ctx.get("dest_base_path", "")
     max_id = 0
-    
+    existing_lookup = None
+
     if max_from_table and spark:
         try:
-            target_df = DeltaTable.forPath(spark, max_from_table).toDF()
+            full_path = dest_base_path + max_from_table
+            target_df = DeltaTable.forPath(spark, full_path).toDF()
             max_id = target_df.agg(
                 F.coalesce(F.max(key_column_name), F.lit(0))
             ).collect()[0][0]
+
+            # If natural_key provided, get existing natural_key -> surrogate_key mapping
+            if natural_key:
+                existing_lookup = target_df.select(
+                    F.col(natural_key).alias("_lookup_natural_key"),
+                    F.col(key_column_name).alias("_existing_surrogate_id")
+                )
         except:
             max_id = 0
 
-    window_spec = Window.orderBy(order_by_col)
-    return df.withColumn(key_column_name, F.row_number().over(window_spec) + max_id)
+    if existing_lookup is not None and natural_key:
+        # Join to find existing surrogate IDs
+        df_with_existing = df.join(
+            existing_lookup,
+            df[natural_key] == existing_lookup["_lookup_natural_key"],
+            "left"
+        )
+
+        # Split into existing and new records
+        existing_records = df_with_existing.filter(F.col("_existing_surrogate_id").isNotNull())
+        new_records = df_with_existing.filter(F.col("_existing_surrogate_id").isNull())
+
+        # For existing: use existing surrogate ID
+        existing_with_key = existing_records.withColumn(
+            key_column_name, F.col("_existing_surrogate_id")
+        ).drop("_lookup_natural_key", "_existing_surrogate_id")
+
+        # For new: generate new surrogate IDs starting from max_id + 1
+        if new_records.count() > 0:
+            window_spec = Window.orderBy(order_by_col)
+            new_with_key = new_records.withColumn(
+                key_column_name, F.row_number().over(window_spec) + max_id
+            ).drop("_lookup_natural_key", "_existing_surrogate_id")
+
+            return existing_with_key.unionByName(new_with_key)
+        else:
+            return existing_with_key
+    else:
+        # No natural key - original behavior (generate for all rows)
+        window_spec = Window.orderBy(order_by_col)
+        return df.withColumn(key_column_name, F.row_number().over(window_spec) + max_id)
 
 
 def lookup_join(df, lookup_table: str, source_key: str,
@@ -442,9 +492,15 @@ def lookup_join(df, lookup_table: str, source_key: str,
     
     Corresponds to: metadata.transform_store.function_name = 'lookup_join'
     Expected params: {"lookup_table": "...", "source_key": "...", "lookup_key": "...", "select_cols": [...]}
+    
+    Note: lookup_table is a relative table name (e.g., 'marketing/assets').
+    The full path is built using dest_base_path from ctx.
     """
     spark = ctx.get("spark")
-    lookup_df = DeltaTable.forPath(spark, lookup_table).toDF()
+    dest_base_path = ctx.get("dest_base_path", "")
+    
+    full_path = dest_base_path + lookup_table
+    lookup_df = DeltaTable.forPath(spark, full_path).toDF()
     lookup_select = lookup_df.select(lookup_key, *select_cols)
 
     return df.join(
@@ -472,7 +528,7 @@ def get_transform_function(function_name: str):
 
 
 def execute_transform_pipeline(spark, df, pipeline: list, params: dict,
-                               transform_lookup: dict):
+                               transform_lookup: dict, dest_base_path: str = ""):
     """
     Execute ordered transform pipeline using metadata lookup.
 
@@ -485,11 +541,13 @@ def execute_transform_pipeline(spark, df, pipeline: list, params: dict,
                 From: instructions.transformations.transform_params JSON
         transform_lookup: Dict from load_transform_store()
                          {transform_id: {"function_name": "...", ...}}
+        dest_base_path: Base ABFS path for destination layer (e.g., GOLD_BASE_PATH)
+                       Used by lookup_join and generate_surrogate_key for table paths
 
     Returns: Transformed DataFrame
     """
     result_df = df
-    ctx = {"spark": spark}  # Context for functions that need spark
+    ctx = {"spark": spark, "dest_base_path": dest_base_path}
 
     for transform_id in pipeline:
         # Get function_name from metadata lookup
@@ -505,7 +563,7 @@ def execute_transform_pipeline(spark, df, pipeline: list, params: dict,
         # Get params for this transform
         transform_params = params.get(str(transform_id), {})
 
-        # Execute transform (pass ctx for functions that need spark)
+        # Execute transform (pass ctx for functions that need spark/paths)
         result_df = transform_func(result_df, **transform_params, **ctx)
 
     return result_df

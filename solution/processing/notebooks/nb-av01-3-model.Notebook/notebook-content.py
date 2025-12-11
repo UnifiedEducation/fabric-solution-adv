@@ -7,16 +7,17 @@
 # META     "name": "synapse_pyspark"
 # META   },
 # META   "dependencies": {
+# META     "lakehouse": {
+# META       "default_lakehouse_name": "",
+# META       "default_lakehouse_workspace_id": "",
+# META       "known_lakehouses": []
+# META     },
 # META     "environment": {
 # META       "environmentId": "8e42a676-c1b7-8c84-4def-63a50b9c5c90",
 # META       "workspaceId": "00000000-0000-0000-0000-000000000000"
 # META     }
 # META   }
 # META }
-
-# MARKDOWN ********************
-
-# ## nb-av01-2-clean
 
 # CELL ********************
 
@@ -34,9 +35,9 @@
 # Load workspace-specific variables from Variable Library
 variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
 
-# Build base paths for Bronze and Silver lakehouses
-BRONZE_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.BRONZE_LH_NAME, area="Tables")
+# Build base paths for all lakehouses
 SILVER_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.SILVER_LH_NAME, area="Tables")
+GOLD_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.GOLD_LH_NAME, area="Tables")
 
 # METADATA ********************
 
@@ -59,9 +60,8 @@ transform_lookup = load_transform_store(spark)
 # Load log store for logging
 log_lookup = load_log_store(spark)
 
-# Get all active transformation instructions for silver layer (Bronze -> Silver)
-transform_instructions = get_active_instructions(spark, "transformations", layer="silver")
-
+# Get all active transformation instructions for gold layer (Silver -> Gold)
+transform_instructions = get_active_instructions(spark, "transformations", layer="gold")
 
 # METADATA ********************
 
@@ -72,7 +72,7 @@ transform_instructions = get_active_instructions(spark, "transformations", layer
 
 # CELL ********************
 
-NOTEBOOK_NAME = "nb-av01-2-clean"
+NOTEBOOK_NAME = "nb-av01-3-model"
 PIPELINE_NAME = "data_pipeline"  # Can be overridden via pipeline parameter
 
 for instr in transform_instructions:
@@ -84,10 +84,10 @@ for instr in transform_instructions:
         source_lh = get_layer_lakehouse(instr["source_layer"], variables)
         dest_lh = get_layer_lakehouse(instr["dest_layer"], variables)
 
-        source_path = BRONZE_BASE_PATH + instr["source_table"]
-        dest_path = SILVER_BASE_PATH + instr["dest_table"]
+        source_path = construct_abfs_path(variables.LH_WORKSPACE_NAME, source_lh) + instr["source_table"]
+        dest_path = construct_abfs_path(variables.LH_WORKSPACE_NAME, dest_lh) + instr["dest_table"]
 
-        print(f"Transforming: {instr['source_table']} -> {instr['dest_table']}")
+        print(f"Modeling: {instr['source_table']} -> {instr['dest_table']}")
 
         # Read source data
         df = spark.read.format("delta").load(source_path)
@@ -103,7 +103,8 @@ for instr in transform_instructions:
             df=df,
             pipeline=pipeline,
             params=params,
-            transform_lookup=transform_lookup
+            transform_lookup=transform_lookup,
+            dest_base_path=GOLD_BASE_PATH
         )
 
         row_count = result_df.count()
@@ -162,6 +163,16 @@ for instr in transform_instructions:
                     started_at=start_time
                 )
         raise
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
 
 # METADATA ********************
 
