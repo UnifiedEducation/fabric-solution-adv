@@ -13,6 +13,14 @@
     {
       "name": "SILVER_LH_NAME",
       "value": "lh_av01_silver"
+    },
+    {
+      "name": "METADATA_SERVER",
+      "value": ""
+    },
+    {
+      "name": "METADATA_DB",
+      "value": ""
     }
   ]
 }

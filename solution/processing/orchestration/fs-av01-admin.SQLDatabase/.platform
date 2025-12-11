@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SQLDatabase",
+    "displayName": "fs-av01-admin"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "cc687db3-1f04-ae4f-461a-d0f6e7493f95"
+  }
+}

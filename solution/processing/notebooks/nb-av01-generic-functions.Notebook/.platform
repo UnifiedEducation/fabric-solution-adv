@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
     "type": "Notebook",
-    "displayName": "nb-av01-0-ingest-youtube",
+    "displayName": "nb-av01-generic-functions",
     "description": "New notebook"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "52880585-f7c3-bea5-4a5a-4da8199a373f"
+    "logicalId": "d3916ef3-d8cb-a89c-4588-081bbcccc021"
   }
 }

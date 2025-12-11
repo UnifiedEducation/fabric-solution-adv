@@ -5,7 +5,7 @@
       "name": "LH_WORKSPACE_NAME",
       "note": "",
       "type": "String",
-      "value": "av01-feature-sprint4-youtubeapi-datastores"
+      "value": "av01-feature-sprint6-metadata-datastores"
     },
     {
       "name": "BRONZE_LH_NAME",
@@ -24,6 +24,18 @@
       "note": "",
       "type": "String",
       "value": "lh_av01_gold"
+    },
+    {
+      "name": "METADATA_SERVER",
+      "note": "",
+      "type": "String",
+      "value": "qg24idc5hohevps4xga52ehiqi-muh3mjog53vehepvdni45vtwfi"
+    },
+    {
+      "name": "METADATA_DB",
+      "note": "",
+      "type": "String",
+      "value": "fs-av01-admin-e7493f95-d0f6-461a-ae4f-1f04cc687db3"
     }
   ]
 }

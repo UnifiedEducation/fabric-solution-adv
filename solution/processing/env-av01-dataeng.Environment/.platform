@@ -1,12 +1,12 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
-    "type": "Notebook",
-    "displayName": "nb-av01-lhcreate-bronze",
-    "description": "New notebook"
+    "type": "Environment",
+    "displayName": "env-av01-dataeng",
+    "description": "Environment"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "75f2090d-93ea-bd07-4f3a-6bf89271eba3"
+    "logicalId": "8e42a676-c1b7-8c84-4def-63a50b9c5c90"
   }
 }

@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
     "type": "Notebook",
-    "displayName": "nb-av01-lhcreate-silver",
+    "displayName": "nb-av01-api-tools-youtube",
     "description": "New notebook"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "ad256508-6b09-9a21-4e1a-f0de179a796f"
+    "logicalId": "e2a055d3-433c-aa38-430e-6b1385b107d4"
   }
 }
