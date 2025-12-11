@@ -7,6 +7,9 @@ CREATE TABLE [log].[validation_results] (
     [passed]              BIT           NOT NULL,
     [observed_value]      JSON          NULL,
     [executed_at]         DATETIME2 (7) DEFAULT (getdate()) NULL,
+    [lakehouse_name]      VARCHAR (100) NULL,
+    [schema_name]         VARCHAR (50)  NULL,
+    [table_name]          VARCHAR (100) NULL,
     PRIMARY KEY CLUSTERED ([result_id] ASC),
     CONSTRAINT [FK_validation_run] FOREIGN KEY ([run_id]) REFERENCES [log].[pipeline_runs] ([run_id])
 );
