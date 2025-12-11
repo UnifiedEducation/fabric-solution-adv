@@ -1,11 +1,22 @@
 -- ============================================================================
+-- PRJ106 Metadata Framework - Seed Initial Data
+-- ============================================================================
+-- This script populates the metadata store with data based on the actual
+-- intermediate project notebooks (nb-int-0 through nb-int-4).
+--
+-- Run this AFTER 01_create_schemas_and_tables.sql
+-- ============================================================================
+
+-- ============================================================================
 -- STEP 1: SEED LOGGING FUNCTIONS
 -- ============================================================================
 
 INSERT INTO metadata.log_store (log_id, function_name, description, expected_params)
 VALUES
 (1, 'log_standard', 'Standard logging - records start, end, row counts, and status',
-    '{"params": ["pipeline_name", "notebook_name", "status", "rows_processed"]}');
+    '{"params": ["pipeline_name", "notebook_name", "status", "rows_processed"]}'),
+(2, 'log_validation', 'Validation logging - one row per expectation result with GX metadata',
+    '{"params": ["validation_result"]}');
 GO
 
 -- ============================================================================
@@ -103,7 +114,7 @@ VALUES
     '{"part": "snippet,statistics,contentDetails", "id": "UCrvoIYkzS-RvCEb0x7wfmwQ"}',
     1, 1),
 (2, 1, '/playlistItems', 'youtube_data_v3/playlistItems/',
-    '{"part": "snippet", "maxResults": 50}',
+    '{"part": "snippet", "maxResults": 50, "playlistId": "UUrvoIYkzS-RvCEb0x7wfmwQ"}',
     1, 1),
 (3, 1, '/videos', 'youtube_data_v3/videos/',
     '{"part": "statistics", "maxResults": 50}',
@@ -182,11 +193,11 @@ VALUES
     'target.channel_surrogate_id = source.channel_surrogate_id AND to_date(target.modified_TS) = to_date(source.modified_TS)',
     'update_all', NULL, 1, 1),
 
--- Videos -> Marketing Assets: add literals, generate surrogate key, rename columns
+-- Videos -> Marketing Assets: add literals, rename columns, generate surrogate key
 (11, 'youtube/videos', 'silver', 'marketing/assets', 'gold',
-    '[4, 5, 3]',
-    '{"4": {"columns": {"channel_surrogate_id": 1}}, "5": {"key_column_name": "asset_surrogate_id", "order_by_col": "video_publish_TS", "max_from_table": "marketing/assets"}, "3": {"column_mapping": {"video_id": "asset_natural_id", "video_title": "asset_title", "video_description": "asset_text", "video_publish_TS": "asset_publish_date", "loading_TS": "modified_TS"}}}',
-    'target.asset_surrogate_id = source.asset_surrogate_id',
+    '[4, 3, 5]',
+    '{"4": {"columns": {"channel_surrogate_id": 1}}, "3": {"column_mapping": {"video_id": "asset_natural_id", "video_title": "asset_title", "video_description": "asset_text", "video_publish_TS": "asset_publish_date", "loading_TS": "modified_TS"}}, "5": {"key_column_name": "asset_surrogate_id", "order_by_col": "asset_publish_date", "natural_key": "asset_natural_id", "max_from_table": "marketing/assets"}}',
+    'target.asset_natural_id = source.asset_natural_id',
     'specific_columns',
     '{"update": ["asset_title", "asset_text", "asset_publish_date", "modified_TS"], "insert": ["asset_surrogate_id", "asset_natural_id", "channel_surrogate_id", "asset_title", "asset_text", "asset_publish_date", "modified_TS"]}',
     1, 1),
@@ -209,31 +220,34 @@ GO
 
 INSERT INTO instructions.validations (validation_instr_id, target_table, target_layer, expectation_id, column_name, validation_params, severity, is_active, log_function_id)
 VALUES
--- marketing/channels validations
-(1, 'marketing/channels', 'gold', 1, 'channel_surrogate_id', NULL, 'error', 1, 1),
-(2, 'marketing/channels', 'gold', 2, 'channel_surrogate_id', NULL, 'error', 1, 1),
-(3, 'marketing/channels', 'gold', 1, 'channel_account_name', NULL, 'error', 1, 1),
+-- marketing/channels validations (from nb_int_setup_gx.ipynb)
+(1, 'marketing/channels', 'gold', 3, 'channel_surrogate_id', '{"value_set": [1]}', 'error', 1, 2),
+(2, 'marketing/channels', 'gold', 4, 'channel_total_views', NULL, 'error', 1, 2),
 
--- marketing/assets validations
-(4, 'marketing/assets', 'gold', 1, 'asset_surrogate_id', NULL, 'error', 1, 1),
-(5, 'marketing/assets', 'gold', 2, 'asset_surrogate_id', NULL, 'error', 1, 1),
-(6, 'marketing/assets', 'gold', 1, 'asset_natural_id', NULL, 'error', 1, 1),
-(7, 'marketing/assets', 'gold', 2, 'asset_natural_id', NULL, 'error', 1, 1),
+-- marketing/assets validations (from nb_int_setup_gx.ipynb)
+(3, 'marketing/assets', 'gold', 2, 'asset_surrogate_id', NULL, 'error', 1, 2),
+(4, 'marketing/assets', 'gold', 1, 'asset_natural_id', NULL, 'error', 1, 2),
+(5, 'marketing/assets', 'gold', 1, 'asset_publish_date', NULL, 'error', 1, 2),
+(6, 'marketing/assets', 'gold', 5, NULL, '{"column_list": ["asset_title", "asset_surrogate_id"]}', 'error', 1, 2),
 
--- marketing/asset_stats validations
-(8, 'marketing/asset_stats', 'gold', 1, 'asset_surrogate_id', NULL, 'error', 1, 1);
+-- marketing/asset_stats validations (from nb_int_setup_gx.ipynb)
+(7, 'marketing/asset_stats', 'gold', 6, 'asset_total_impressions', NULL, 'error', 1, 2);
 GO
 
-
+-- ============================================================================
+-- STEP 11: SEED COLUMN MAPPINGS
+-- ============================================================================
+-- Maps source JSON paths to target Delta columns for loading functions.
+-- Note: Do NOT include 'item.' prefix - the code adds it dynamically when exploding "items" array
 
 -- YouTube Channels mapping
 INSERT INTO metadata.column_mappings (mapping_id, column_order, source_column, target_column, data_type, description) VALUES
-('youtube_channels', 1, 'item.id', 'channel_id', 'string', 'YouTube channel ID'),
-('youtube_channels', 2, 'item.snippet.title', 'channel_name', 'string', 'Channel display name'),
-('youtube_channels', 3, 'item.snippet.description', 'channel_description', 'string', 'Channel description'),
-('youtube_channels', 4, 'item.statistics.viewCount', 'view_count', 'int', 'Total channel views'),
-('youtube_channels', 5, 'item.statistics.subscriberCount', 'subscriber_count', 'int', 'Subscriber count'),
-('youtube_channels', 6, 'item.statistics.videoCount', 'video_count', 'int', 'Number of videos'),
+('youtube_channels', 1, 'id', 'channel_id', 'string', 'YouTube channel ID'),
+('youtube_channels', 2, 'snippet.title', 'channel_name', 'string', 'Channel display name'),
+('youtube_channels', 3, 'snippet.description', 'channel_description', 'string', 'Channel description'),
+('youtube_channels', 4, 'statistics.viewCount', 'view_count', 'int', 'Total channel views'),
+('youtube_channels', 5, 'statistics.subscriberCount', 'subscriber_count', 'int', 'Subscriber count'),
+('youtube_channels', 6, 'statistics.videoCount', 'video_count', 'int', 'Number of videos'),
 ('youtube_channels', 7, '_loading_ts', 'loading_TS', 'current_timestamp', 'Load timestamp');
 GO
 
@@ -257,3 +271,6 @@ INSERT INTO metadata.column_mappings (mapping_id, column_order, source_column, t
 ('youtube_videos', 5, '_loading_ts', 'loading_TS', 'current_timestamp', 'Load timestamp');
 GO
 
+-- ============================================================================
+-- SEED DATA COMPLETE
+-- ============================================================================

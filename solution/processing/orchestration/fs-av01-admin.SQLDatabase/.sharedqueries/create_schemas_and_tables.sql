@@ -1,6 +1,3 @@
--- ============================================================================
--- STEP 1: CREATE SCHEMAS
--- ============================================================================
 
 IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'metadata')
     EXEC('CREATE SCHEMA metadata');
@@ -14,9 +11,6 @@ IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'log')
     EXEC('CREATE SCHEMA log');
 GO
 
--- ============================================================================
--- STEP 2: CREATE METADATA CATALOG TABLES
--- ============================================================================
 
 -- Source Store: Registry of all data sources and their authentication details
 CREATE TABLE metadata.source_store (
@@ -70,22 +64,18 @@ CREATE TABLE metadata.log_store (
 );
 GO
 
--- metadata column mappings
+-- Column Mappings Store: Maps source JSON paths to target Delta columns
 CREATE TABLE metadata.column_mappings (
-    mapping_id          VARCHAR(100) NOT NULL,      -- e.g., 'youtube_channels', 'salesforce_accounts'
-    column_order        INT NOT NULL,               -- Order of columns (1, 2, 3...)
-    source_column       VARCHAR(255) NOT NULL,      -- JSON path e.g., 'snippet.title', '_loading_ts'
-    target_column       VARCHAR(100) NOT NULL,      -- Delta column name e.g., 'channel_name'
-    data_type           VARCHAR(50) NOT NULL,       -- 'string', 'int', 'timestamp', 'current_timestamp'
-    description         VARCHAR(500),               -- Optional description
+    mapping_id          VARCHAR(100) NOT NULL,          -- e.g., 'youtube_channels', 'salesforce_accounts'
+    column_order        INT NOT NULL,                   -- Order of columns (1, 2, 3...)
+    source_column       VARCHAR(255) NOT NULL,          -- JSON path e.g., 'snippet.title', '_loading_ts'
+    target_column       VARCHAR(100) NOT NULL,          -- Delta column name e.g., 'channel_name'
+    data_type           VARCHAR(50) NOT NULL,           -- 'string', 'int', 'timestamp', 'current_timestamp'
+    description         VARCHAR(500),                   -- Optional description
     PRIMARY KEY (mapping_id, column_order)
 );
 GO
 
-
--- ============================================================================
--- STEP 3: CREATE INSTRUCTION TABLES
--- ============================================================================
 
 -- Ingestion Instructions: What to ingest from external sources
 CREATE TABLE instructions.ingestion (
@@ -170,10 +160,6 @@ CREATE TABLE instructions.validations (
 );
 GO
 
--- ============================================================================
--- STEP 4: CREATE LOG TABLES
--- ============================================================================
-
 -- Pipeline Runs: Execution history of pipelines
 CREATE TABLE log.pipeline_runs (
     run_id              BIGINT IDENTITY(1,1) PRIMARY KEY,
@@ -182,7 +168,11 @@ CREATE TABLE log.pipeline_runs (
     completed_at        DATETIME2,
     status              VARCHAR(20) NOT NULL,           -- 'running', 'success', 'failed'
     records_processed   INT,
-    error_message       NVARCHAR(MAX)
+    error_message       NVARCHAR(MAX),
+    action_type         VARCHAR(20),                    -- 'ingestion', 'loading', 'transformation', 'validation'
+    source_name         VARCHAR(100),                   -- e.g., 'youtube_api'
+    instruction_detail  VARCHAR(500),                   -- endpoint path, table name, etc.
+    notebook_name       VARCHAR(100)                    -- which notebook ran this
 );
 GO
 
@@ -196,6 +186,9 @@ CREATE TABLE log.validation_results (
     passed              BIT NOT NULL,
     observed_value      JSON,
     executed_at         DATETIME2 DEFAULT GETDATE(),
+    lakehouse_name      VARCHAR(100),                   -- Lakehouse being validated
+    schema_name         VARCHAR(50),                    -- Schema name (e.g., 'marketing')
+    table_name          VARCHAR(100),                   -- Table name (e.g., 'channels')
     CONSTRAINT FK_validation_run FOREIGN KEY (run_id)
         REFERENCES log.pipeline_runs(run_id)
 );
@@ -213,6 +206,3 @@ CREATE TABLE log.metadata_changes (
     new_values          JSON
 );
 GO
-
-
-

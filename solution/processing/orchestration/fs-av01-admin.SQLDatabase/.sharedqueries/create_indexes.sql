@@ -1,7 +1,5 @@
-
--- ============================================================================
--- CREATE INDEXES FOR PERFORMANCE
--- ============================================================================
+-- Index for column_mappings lookup
+CREATE INDEX IX_column_mappings_id ON metadata.column_mappings(mapping_id);
 
 -- Indexes on instruction tables for common queries
 CREATE INDEX IX_ingestion_source ON instructions.ingestion(source_id, is_active);
