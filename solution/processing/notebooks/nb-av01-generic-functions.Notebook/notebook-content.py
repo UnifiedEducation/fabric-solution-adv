@@ -39,7 +39,7 @@ from datetime import datetime
 # Fabric/Spark
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, LongType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, LongType, TimestampType, BooleanType
 from delta.tables import DeltaTable
 import notebookutils
 
@@ -163,7 +163,7 @@ def log_standard(spark, pipeline_name: str, notebook_name: str, status: str,
     Writes to: [log].[pipeline_runs]
 
     Args:
-        pipeline_name: Name of the pipeline (e.g., 'youtube_pipeline')
+        pipeline_name: Name of the pipeline (e.g., 'data_pipeline')
         notebook_name: Name of the notebook executing this action
         status: 'running', 'success', or 'failed'
         rows_processed: Number of records processed
@@ -208,41 +208,88 @@ def log_standard(spark, pipeline_name: str, notebook_name: str, status: str,
     return rows_processed
 
 
-
-def log_validation(spark, validation_result, **ctx) -> int:
+def log_validation(spark, validation_result, target_table: str = None,
+                   lakehouse_name: str = None, started_at: datetime = None, **ctx) -> int:
     """
     Validation-specific logging - logs one row per expectation result.
-    
+
     Corresponds to: metadata.log_store.function_name = 'log_validation' (log_id=2)
     Writes to: [log].[validation_results] in metadata database
-    
+
+    Table schema (11 columns):
+        result_id (IDENTITY), run_id, validation_instr_id, expectation_type,
+        column_name, passed, observed_value, executed_at,
+        lakehouse_name, schema_name, table_name
+
     Args:
         spark: SparkSession
         validation_result: GX ValidationResult object from batch.validate()
-    
+        target_table: Full table path (e.g., 'marketing/channels')
+        lakehouse_name: Name of the lakehouse being validated
+        started_at: When validation started
+
     Returns: number of expectation results logged
     """
-    results_flattened = [
-        {
-            "validation_id": validation_result.meta['validation_id'],
-            "expectation_type": result.expectation_config.type,
-            "column": result.expectation_config.kwargs.get("column", None),
-            "success": result.success,
-            "test_timestamp": datetime.strptime(
-                validation_result.meta['batch_markers']['ge_load_time'],
-                "%Y%m%dT%H%M%S.%fZ"
-            )
-        } for result in validation_result.results
-    ]
+    executed_at = datetime.now()
 
-    pandas_df = pd.DataFrame(results_flattened)
-    spark_results_df = spark.createDataFrame(pandas_df)
+    # Get validation instructions from metadata attached to the result
+    validation_instructions = validation_result.meta.get("validation_instructions", [])
+
+    # Parse target_table into schema_name and table_name
+    schema_name = None
+    table_name = None
+    if target_table:
+        parts = target_table.split("/")
+        if len(parts) == 2:
+            schema_name = parts[0]
+            table_name = parts[1]
+        else:
+            table_name = target_table
+
+    # Schema must match [log].[validation_results] table exactly (11 columns)
+    schema = StructType([
+        StructField("result_id", LongType(), nullable=False),  # IDENTITY - pass 0
+        StructField("run_id", LongType(), nullable=True),  # FK to pipeline_runs (nullable)
+        StructField("validation_instr_id", IntegerType(), nullable=True),
+        StructField("expectation_type", StringType(), nullable=True),
+        StructField("column_name", StringType(), nullable=True),
+        StructField("passed", BooleanType(), nullable=False),  # BIT maps to BooleanType
+        StructField("observed_value", StringType(), nullable=True),  # JSON as string
+        StructField("executed_at", TimestampType(), nullable=True),
+        StructField("lakehouse_name", StringType(), nullable=True),
+        StructField("schema_name", StringType(), nullable=True),
+        StructField("table_name", StringType(), nullable=True)
+    ])
+
+    # Build results data matching each expectation result to its instruction
+    results_data = []
+    for i, result in enumerate(validation_result.results):
+        # Try to get validation_instr_id from the metadata we attached
+        validation_instr_id = None
+        if i < len(validation_instructions):
+            validation_instr_id = validation_instructions[i].get("validation_instr_id")
+
+        results_data.append((
+            0,  # result_id - IDENTITY auto-generated
+            None,  # run_id - could link to pipeline_runs if needed
+            validation_instr_id,
+            result.expectation_config.type,
+            result.expectation_config.kwargs.get("column", None),
+            result.success,  # Boolean True/False for BIT column
+            json.dumps(result.result) if hasattr(result, 'result') and result.result else None,
+            executed_at,
+            lakehouse_name,
+            schema_name,
+            table_name
+        ))
+
+    log_df = spark.createDataFrame(results_data, schema)
 
     # Use .mssql() for writing (same connector as reading)
-    spark_results_df.write.mode("append").option("url", METADATA_DB_URL).mssql("log.validation_results")
+    log_df.write.mode("append").option("url", METADATA_DB_URL).mssql("log.validation_results")
 
-    print(f"  -> Logged {len(results_flattened)} validation results")
-    return len(results_flattened)
+    print(f"  -> Logged {len(results_data)} validation results for {lakehouse_name or ''}.{target_table or 'table'}")
+    return len(results_data)
 
 # METADATA ********************
 
