@@ -23,35 +23,6 @@
 
 # CELL ********************
 
-COLUMN_MAPPINGS = {
-    "youtube_channels": [
-        {"source": "item.id", "target": "channel_id", "type": "string"},
-        {"source": "item.snippet.title", "target": "channel_name", "type": "string"},
-        {"source": "item.snippet.description", "target": "channel_description", "type": "string"},
-        {"source": "item.statistics.viewCount", "target": "view_count", "type": "int"},
-        {"source": "item.statistics.subscriberCount", "target": "subscriber_count", "type": "int"},
-        {"source": "item.statistics.videoCount", "target": "video_count", "type": "int"},
-        {"source": "_loading_ts", "target": "loading_TS", "type": "current_timestamp"}
-    ],
-    "youtube_playlist_items": [
-        {"source": "snippet.channelId", "target": "channel_id", "type": "string"},
-        {"source": "snippet.resourceId.videoId", "target": "video_id", "type": "string"},
-        {"source": "snippet.title", "target": "video_title", "type": "string"},
-        {"source": "snippet.description", "target": "video_description", "type": "string"},
-        {"source": "snippet.thumbnails.high.url", "target": "thumbnail_url", "type": "string"},
-        {"source": "snippet.publishedAt", "target": "video_publish_TS", "type": "timestamp"},
-        {"source": "_loading_ts", "target": "loading_TS", "type": "current_timestamp"}
-    ],
-    "youtube_videos": [
-        {"source": "id", "target": "video_id", "type": "string"},
-        {"source": "statistics.viewCount", "target": "video_view_count", "type": "int"},
-        {"source": "statistics.likeCount", "target": "video_like_count", "type": "int"},
-        {"source": "statistics.commentCount", "target": "video_comment_count", "type": "int"},
-        {"source": "_loading_ts", "target": "loading_TS", "type": "current_timestamp"}
-    ]
-}
-
-
 # YouTube API Helper Functions
 
 def extract_video_ids(playlist_items: list) -> list:

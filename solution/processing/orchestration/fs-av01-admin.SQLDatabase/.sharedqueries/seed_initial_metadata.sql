@@ -223,3 +223,37 @@ VALUES
 -- marketing/asset_stats validations
 (8, 'marketing/asset_stats', 'gold', 1, 'asset_surrogate_id', NULL, 'error', 1, 1);
 GO
+
+
+
+-- YouTube Channels mapping
+INSERT INTO metadata.column_mappings (mapping_id, column_order, source_column, target_column, data_type, description) VALUES
+('youtube_channels', 1, 'item.id', 'channel_id', 'string', 'YouTube channel ID'),
+('youtube_channels', 2, 'item.snippet.title', 'channel_name', 'string', 'Channel display name'),
+('youtube_channels', 3, 'item.snippet.description', 'channel_description', 'string', 'Channel description'),
+('youtube_channels', 4, 'item.statistics.viewCount', 'view_count', 'int', 'Total channel views'),
+('youtube_channels', 5, 'item.statistics.subscriberCount', 'subscriber_count', 'int', 'Subscriber count'),
+('youtube_channels', 6, 'item.statistics.videoCount', 'video_count', 'int', 'Number of videos'),
+('youtube_channels', 7, '_loading_ts', 'loading_TS', 'current_timestamp', 'Load timestamp');
+GO
+
+-- YouTube Playlist Items mapping
+INSERT INTO metadata.column_mappings (mapping_id, column_order, source_column, target_column, data_type, description) VALUES
+('youtube_playlist_items', 1, 'snippet.channelId', 'channel_id', 'string', 'Channel ID'),
+('youtube_playlist_items', 2, 'snippet.resourceId.videoId', 'video_id', 'string', 'Video ID'),
+('youtube_playlist_items', 3, 'snippet.title', 'video_title', 'string', 'Video title'),
+('youtube_playlist_items', 4, 'snippet.description', 'video_description', 'string', 'Video description'),
+('youtube_playlist_items', 5, 'snippet.thumbnails.high.url', 'thumbnail_url', 'string', 'Thumbnail URL'),
+('youtube_playlist_items', 6, 'snippet.publishedAt', 'video_publish_TS', 'timestamp', 'Video publish timestamp'),
+('youtube_playlist_items', 7, '_loading_ts', 'loading_TS', 'current_timestamp', 'Load timestamp');
+GO
+
+-- YouTube Videos mapping
+INSERT INTO metadata.column_mappings (mapping_id, column_order, source_column, target_column, data_type, description) VALUES
+('youtube_videos', 1, 'id', 'video_id', 'string', 'Video ID'),
+('youtube_videos', 2, 'statistics.viewCount', 'video_view_count', 'int', 'Video view count'),
+('youtube_videos', 3, 'statistics.likeCount', 'video_like_count', 'int', 'Video like count'),
+('youtube_videos', 4, 'statistics.commentCount', 'video_comment_count', 'int', 'Video comment count'),
+('youtube_videos', 5, '_loading_ts', 'loading_TS', 'current_timestamp', 'Load timestamp');
+GO
+

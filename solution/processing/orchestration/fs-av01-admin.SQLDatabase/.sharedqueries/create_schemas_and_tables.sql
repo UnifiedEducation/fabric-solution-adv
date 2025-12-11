@@ -70,6 +70,19 @@ CREATE TABLE metadata.log_store (
 );
 GO
 
+-- metadata column mappings
+CREATE TABLE metadata.column_mappings (
+    mapping_id          VARCHAR(100) NOT NULL,      -- e.g., 'youtube_channels', 'salesforce_accounts'
+    column_order        INT NOT NULL,               -- Order of columns (1, 2, 3...)
+    source_column       VARCHAR(255) NOT NULL,      -- JSON path e.g., 'snippet.title', '_loading_ts'
+    target_column       VARCHAR(100) NOT NULL,      -- Delta column name e.g., 'channel_name'
+    data_type           VARCHAR(50) NOT NULL,       -- 'string', 'int', 'timestamp', 'current_timestamp'
+    description         VARCHAR(500),               -- Optional description
+    PRIMARY KEY (mapping_id, column_order)
+);
+GO
+
+
 -- ============================================================================
 -- STEP 3: CREATE INSTRUCTION TABLES
 -- ============================================================================

@@ -269,19 +269,20 @@ def load_json_to_delta(spark, source_path: str, target_path: str,
     Corresponds to: metadata.loading_store.function_name = 'load_json_to_delta'
     
     Args:
+        spark: SparkSession
         source_path: ABFS path to raw JSON files folder
         target_path: ABFS path to target Delta table
-        column_mapping_id: Key into COLUMN_MAPPINGS dict
+        column_mapping_id: Key to lookup in metadata.column_mappings table
         merge_condition: SQL condition for MERGE (e.g., 'target.id = source.id')
         merge_type: 'update_all' or 'specific_columns'
         merge_columns: Dict with 'update' and 'insert' column lists if merge_type='specific_columns'
     
     Returns: row count processed
     """
-    # Get column mapping
-    mapping = COLUMN_MAPPINGS.get(column_mapping_id, [])
+    # Get column mapping from metadata
+    mapping = load_column_mappings(spark, column_mapping_id)
     if not mapping:
-        raise ValueError(f"Column mapping '{column_mapping_id}' not found")
+        raise ValueError(f"Column mapping '{column_mapping_id}' not found in metadata.column_mappings")
 
     # Read most recent JSON file
     most_recent = get_most_recent_file(source_path, "")
@@ -669,25 +670,6 @@ def query_metadata_table(spark, schema_table: str) -> list:
     return [row.asDict() for row in df.collect()]
 
 
-def query_metadata_sql(spark, query: str) -> list:
-    """
-    Execute a custom SQL query against the metadata database.
-    Uses JDBC format for custom queries since mssql() only takes table names.
-    
-    Args:
-        spark: SparkSession
-        query: SQL query to execute
-    
-    Returns: List of row dicts
-    """
-    df = (spark.read
-        .format("jdbc")
-        .option("url", METADATA_DB_URL)
-        .option("query", query)
-        .load())
-    return [row.asDict() for row in df.collect()]
-
-
 def load_source_store(spark) -> dict:
     """
     Load metadata.source_store as lookup dict by source_id.
@@ -733,6 +715,23 @@ def load_log_store(spark) -> dict:
     return {row["log_id"]: row for row in rows}
 
 
+def load_column_mappings(spark, mapping_id: str) -> list:
+    """
+    Load column mappings from metadata.column_mappings for a specific mapping_id.
+    Used by load_json_to_delta() to get source->target column mappings.
+    
+    Args:
+        spark: SparkSession
+        mapping_id: The mapping identifier (e.g., 'youtube_channels')
+    
+    Returns: List of dicts with source, target, type keys, ordered by column_order
+    """
+    rows = query_metadata_table(spark, "metadata.column_mappings")
+    filtered = [r for r in rows if r["mapping_id"] == mapping_id]
+    filtered.sort(key=lambda x: x["column_order"])
+    return [{"source": r["source_column"], "target": r["target_column"], "type": r["data_type"]} for r in filtered]
+
+
 def get_active_instructions(spark, instruction_type: str, layer: str = None) -> list:
     """
     Get active instructions from the appropriate instruction table.
@@ -740,27 +739,26 @@ def get_active_instructions(spark, instruction_type: str, layer: str = None) -> 
     Args:
         spark: SparkSession
         instruction_type: 'loading', 'transformations', 'validations', 'ingestion'
-        layer: Optional filter by source_layer, target_layer, or dest_layer
+        layer: Optional filter by target_layer or dest_layer
     
     Returns: List of instruction row dicts
     """
     table = f"instructions.{instruction_type}"
+    rows = query_metadata_table(spark, table)
     
+    # Filter active instructions
+    result = [r for r in rows if r.get("is_active") == 1]
+    
+    # Filter by layer if specified
     if layer:
-        # Use SQL query for filtered results
         if instruction_type == "loading":
-            query = f"SELECT * FROM {table} WHERE is_active = 1 AND target_layer = '{layer}'"
+            result = [r for r in result if r.get("target_layer") == layer]
         elif instruction_type == "transformations":
-            query = f"SELECT * FROM {table} WHERE is_active = 1 AND dest_layer = '{layer}'"
+            result = [r for r in result if r.get("dest_layer") == layer]
         elif instruction_type == "validations":
-            query = f"SELECT * FROM {table} WHERE is_active = 1 AND target_layer = '{layer}'"
-        else:
-            query = f"SELECT * FROM {table} WHERE is_active = 1"
-        return query_metadata_sql(spark, query)
-    else:
-        # Read full table and filter in Spark
-        rows = query_metadata_table(spark, table)
-        return [r for r in rows if r.get("is_active") == 1]
+            result = [r for r in result if r.get("target_layer") == layer]
+    
+    return result
 
 # METADATA ********************
 
