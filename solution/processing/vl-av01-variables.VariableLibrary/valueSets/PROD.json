@@ -9,6 +9,14 @@
     {
       "name": "BRONZE_LH_NAME",
       "value": "lh_av01_bronze"
+    },
+    {
+      "name": "METADATA_SERVER",
+      "value": ""
+    },
+    {
+      "name": "METADATA_DB",
+      "value": ""
     }
   ]
 }
