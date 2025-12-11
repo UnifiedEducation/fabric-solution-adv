@@ -95,7 +95,7 @@ ingestion_instructions = get_active_instructions(spark, "ingestion")
 
 # MARKDOWN ********************
 
-# ## Cell 6: API Ingestion Functions
+# **API Ingestion Functions**
 # 
 # Source-specific ingestion logic. These handle pagination, authentication, and API quirks.
 
@@ -167,7 +167,7 @@ def ingest_rest_api(source_meta: dict, endpoint_path: str,
 
 # MARKDOWN ********************
 
-# ## Cell 7: Execute Ingestion Instructions
+# **Execute Ingestion Instructions**
 
 # CELL ********************
 
