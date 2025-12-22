@@ -1,0 +1,176 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "0_INGEST notebook",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": {
+            "value": "@pipeline().libraryVariables.vlav01variables__0_INGEST_NOTEBOOK_ID",
+            "type": "Expression"
+          },
+          "workspaceId": {
+            "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "1_LOAD notebook",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "0_INGEST notebook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": {
+            "value": "@pipeline().libraryVariables.vlav01variables__1_LOAD_NOTEBOOK_ID",
+            "type": "Expression"
+          },
+          "workspaceId": {
+            "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "2_CLEAN notebook",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "1_LOAD notebook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": {
+            "value": "@pipeline().libraryVariables.vlav01variables__2_CLEAN_NOTEBOOK_ID",
+            "type": "Expression"
+          },
+          "workspaceId": {
+            "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "3_MODEL notebook",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "2_CLEAN notebook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": {
+            "value": "@pipeline().libraryVariables.vlav01variables__3_MODEL_NOTEBOOK_ID",
+            "type": "Expression"
+          },
+          "workspaceId": {
+            "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "4_VALIDATE notebook",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "3_MODEL notebook",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": {
+            "value": "@pipeline().libraryVariables.vlav01variables__4_VALIDATE_NOTEBOOK_ID",
+            "type": "Expression"
+          },
+          "workspaceId": {
+            "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
+            "type": "Expression"
+          }
+        }
+      }
+    ],
+    "libraryVariables": {
+      "vlav01variables__0_INGEST_NOTEBOOK_ID": {
+        "type": "String",
+        "variableName": "_0_INGEST_NOTEBOOK_ID",
+        "libraryName": "vl-av01-variables"
+      },
+      "vlav01variables__1_LOAD_NOTEBOOK_ID": {
+        "type": "String",
+        "variableName": "_1_LOAD_NOTEBOOK_ID",
+        "libraryName": "vl-av01-variables"
+      },
+      "vlav01variables__2_CLEAN_NOTEBOOK_ID": {
+        "type": "String",
+        "variableName": "_2_CLEAN_NOTEBOOK_ID",
+        "libraryName": "vl-av01-variables"
+      },
+      "vlav01variables__3_MODEL_NOTEBOOK_ID": {
+        "type": "String",
+        "variableName": "_3_MODEL_NOTEBOOK_ID",
+        "libraryName": "vl-av01-variables"
+      },
+      "vlav01variables__4_VALIDATE_NOTEBOOK_ID": {
+        "type": "String",
+        "variableName": "_4_VALIDATE_NOTEBOOK_ID",
+        "libraryName": "vl-av01-variables"
+      },
+      "vlav01variables_PROCESSING_WORKSPACE_ID": {
+        "type": "String",
+        "variableName": "PROCESSING_WORKSPACE_ID",
+        "libraryName": "vl-av01-variables"
+      }
+    }
+  }
+}
