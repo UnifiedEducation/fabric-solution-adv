@@ -133,14 +133,18 @@ def update_workspace_from_git(workspace_id, workspace_name):
 
     try:
         response_json = json.loads(update_response.stdout)
-        if response_json.get('status_code') in [200, 201, 202]:
+        status_code = response_json.get('status_code')
+        if status_code in [200, 201, 202]:
             print(f"  ✓ Updated {workspace_name} from Git")
             return True
+        else:
+            print(f"  ⚠ Update from Git failed (status: {status_code})")
+            print(f"     Response: {response_json.get('text', response_json)}")
+            return False
     except json.JSONDecodeError:
-        pass
-
-    print(f"  ⚠ Update from Git may have failed")
-    return False
+        print(f"  ⚠ Update from Git failed - invalid response")
+        print(f"     Raw output: {update_response.stdout[:500]}")
+        return False
 
 
 def connect_workspace_to_git(workspace_id, workspace_name, directory_name, git_config, connection_id):
