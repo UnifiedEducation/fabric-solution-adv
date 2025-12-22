@@ -837,6 +837,10 @@ def run_all_tests():
 # Run all tests
 all_passed = run_all_tests()
 
+# Fail the notebook job if any tests failed (for CI/CD integration)
+if not all_passed:
+    raise RuntimeError("Unit tests failed. See output above for details.")
+
 # METADATA ********************
 
 # META {

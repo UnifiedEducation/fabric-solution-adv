@@ -1,0 +1,180 @@
+name: Test and Promote Engineering Workloads
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspaces_to_sync:
+        description: "Engineering workspace types to sync (comma-separated: processing,datastores)"
+        required: true
+        type: string
+        default: "processing,datastores"
+      skip_tests:
+        description: 'Skip unit tests and promote directly'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  POLL_INTERVAL: 30
+  CAPACITY_TIMEOUT: 600
+  NOTEBOOK_TIMEOUT: 600
+
+jobs:
+  sync-and-test:
+    runs-on: windows-latest
+    outputs:
+      test_passed: ${{ steps.run_tests.outcome == 'success' || inputs.skip_tests }}
+    steps:
+      - name: Get Access Token
+        id: auth
+        shell: bash
+        run: |
+          AZURE_TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.SPN_CLIENT_ID }}&client_secret=${{ secrets.SPN_CLIENT_SECRET }}&scope=https://management.azure.com/.default&grant_type=client_credentials" \
+            | grep -oP '"access_token"\s*:\s*"\K[^"]+')
+          echo "AZURE_TOKEN=$AZURE_TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Resume TEST Engineering Capacity
+        shell: bash
+        run: |
+          curl -s -X POST "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.TEST_ENGINEERING_CAPACITY }}/resume?api-version=2023-11-01" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.AZURE_TOKEN }}" \
+            -H "Content-Length: 0"
+          echo "Resume request sent for TEST engineering capacity"
+          START=$(date +%s)
+          URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.TEST_ENGINEERING_CAPACITY }}?api-version=2023-11-01"
+          while true; do
+            ELAPSED=$(($(date +%s) - START))
+            [ $ELAPSED -ge $CAPACITY_TIMEOUT ] && echo "Timeout waiting for engineering capacity" && exit 1
+            STATUS=$(curl -s "$URL" -H "Authorization: Bearer ${{ steps.auth.outputs.AZURE_TOKEN }}")
+            echo "$STATUS" | grep -q '"state".*"Active"' && echo "TEST Engineering Capacity Active" && break
+            echo "Waiting for TEST engineering capacity... (${ELAPSED}s)"
+            sleep $POLL_INTERVAL
+          done
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r config/requirements.txt
+
+      - name: Sync TEST workspaces
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          GITHUB_ACTIONS: true
+          PYTHONUTF8: 1
+          PYTHONIOENCODING: utf-8
+          TARGET_ENVIRONMENT: test
+          WORKSPACES_TO_SYNC: ${{ inputs.workspaces_to_sync }}
+        run: |
+          chcp 65001
+          python config/scripts/sync_environment_workspaces.py
+
+      - name: Run Unit Tests
+        id: run_tests
+        if: ${{ !inputs.skip_tests }}
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_ACTIONS: true
+          PYTHONUTF8: 1
+          PYTHONIOENCODING: utf-8
+          TEST_WORKSPACE_NAME: av01-test-processing
+        run: |
+          chcp 65001
+          python config/scripts/run_unit_tests_in_fabric.py
+
+      - name: Suspend TEST Engineering Capacity
+        if: always()
+        shell: bash
+        run: |
+          TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.SPN_CLIENT_ID }}&client_secret=${{ secrets.SPN_CLIENT_SECRET }}&scope=https://management.azure.com/.default&grant_type=client_credentials" \
+            | grep -oP '"access_token"\s*:\s*"\K[^"]+')
+          curl -s -X POST "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.TEST_ENGINEERING_CAPACITY }}/suspend?api-version=2023-11-01" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Length: 0"
+          echo "Suspend request sent for TEST engineering capacity"
+
+  promote-to-prod:
+    needs: sync-and-test
+    if: ${{ needs.sync-and-test.outputs.test_passed == 'true' || needs.sync-and-test.result == 'success' }}
+    runs-on: windows-latest
+    steps:
+      - name: Get Access Token
+        id: auth
+        shell: bash
+        run: |
+          AZURE_TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.SPN_CLIENT_ID }}&client_secret=${{ secrets.SPN_CLIENT_SECRET }}&scope=https://management.azure.com/.default&grant_type=client_credentials" \
+            | grep -oP '"access_token"\s*:\s*"\K[^"]+')
+          echo "AZURE_TOKEN=$AZURE_TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Resume PROD Engineering Capacity
+        shell: bash
+        run: |
+          curl -s -X POST "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.PROD_ENGINEERING_CAPACITY }}/resume?api-version=2023-11-01" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.AZURE_TOKEN }}" \
+            -H "Content-Length: 0"
+          echo "Resume request sent for PROD engineering capacity"
+          START=$(date +%s)
+          URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.PROD_ENGINEERING_CAPACITY }}?api-version=2023-11-01"
+          while true; do
+            ELAPSED=$(($(date +%s) - START))
+            [ $ELAPSED -ge $CAPACITY_TIMEOUT ] && echo "Timeout waiting for engineering capacity" && exit 1
+            STATUS=$(curl -s "$URL" -H "Authorization: Bearer ${{ steps.auth.outputs.AZURE_TOKEN }}")
+            echo "$STATUS" | grep -q '"state".*"Active"' && echo "PROD Engineering Capacity Active" && break
+            echo "Waiting for PROD engineering capacity... (${ELAPSED}s)"
+            sleep $POLL_INTERVAL
+          done
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r config/requirements.txt
+
+      - name: Sync PROD workspaces
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          GITHUB_ACTIONS: true
+          PYTHONUTF8: 1
+          PYTHONIOENCODING: utf-8
+          TARGET_ENVIRONMENT: prod
+          WORKSPACES_TO_SYNC: ${{ inputs.workspaces_to_sync }}
+        run: |
+          chcp 65001
+          python config/scripts/sync_environment_workspaces.py
+
+      - name: Suspend PROD Engineering Capacity
+        if: always()
+        shell: bash
+        run: |
+          TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.SPN_CLIENT_ID }}&client_secret=${{ secrets.SPN_CLIENT_SECRET }}&scope=https://management.azure.com/.default&grant_type=client_credentials" \
+            | grep -oP '"access_token"\s*:\s*"\K[^"]+')
+          curl -s -X POST "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.PROD_ENGINEERING_CAPACITY }}/suspend?api-version=2023-11-01" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Length: 0"
+          echo "Suspend request sent for PROD engineering capacity"
