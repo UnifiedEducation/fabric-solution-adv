@@ -1,12 +1,15 @@
 """
-Sync workspaces for a given environment (test or prod) from Git.
+Sync workspaces for a given environment (dev, test, or prod).
 
 This script reads the workspace configuration and syncs workspaces
-that belong to the target environment. It supports selective syncing
-based on workspace types (processing, datastores, consumption).
+that belong to the target environment using the appropriate method:
+- Git-connected workspaces (have 'connect_to_git_folder'): Use Git sync API
+- Non-Git workspaces: Use Item Definition API to deploy items
+
+This implements Microsoft's "Option 2" CI/CD pattern for Fabric.
 
 Environment variables:
-    TARGET_ENVIRONMENT: Environment to sync (e.g., 'test', 'prod')
+    TARGET_ENVIRONMENT: Environment to sync ('dev', 'test', or 'prod')
     WORKSPACES_TO_SYNC: Comma-separated workspace types (e.g., 'processing,datastores')
                         If not set, syncs all workspace types.
     CONFIG_FILE: Path to YAML config (default: config/templates/v01/v01-template.yml)
@@ -25,7 +28,7 @@ if str(config_dir) not in sys.path:
     sys.path.insert(0, str(config_dir))
 
 # Import from fabric_core modules (must be after sys.path modification)
-from fabric_core import auth, get_workspace_id, update_workspace_from_git
+from fabric_core import auth, get_workspace_id, update_workspace_from_git, deploy_items_to_workspace
 from fabric_core.utils import load_config
 # fmt: on
 
@@ -41,7 +44,7 @@ def get_environment_workspaces(workspaces_config, environment, solution_version,
 
     Args:
         workspaces_config: List of workspace configurations from YAML
-        environment: Target environment ('test' or 'prod')
+        environment: Target environment ('dev', 'test', or 'prod')
         solution_version: Solution version prefix (e.g., 'av01')
         workspace_types: Optional list of workspace types to include (e.g., ['processing', 'datastores'])
                         If None, includes all workspace types.
@@ -97,8 +100,8 @@ def main():
 
     # Get target environment
     environment = os.getenv('TARGET_ENVIRONMENT', '').lower()
-    if environment not in ['test', 'prod']:
-        print(f"✗ Invalid TARGET_ENVIRONMENT: '{environment}' (must be 'test' or 'prod')")
+    if environment not in ['dev', 'test', 'prod']:
+        print(f"✗ Invalid TARGET_ENVIRONMENT: '{environment}' (must be 'dev', 'test', or 'prod')")
         sys.exit(1)
 
     # Load config
@@ -135,12 +138,14 @@ def main():
         print("\n✗ Authentication failed")
         sys.exit(1)
 
-    # Sync each workspace
+    # Sync each workspace using appropriate method
     failed = []
     succeeded = []
 
     for ws_config in env_workspaces:
         workspace_name = ws_config['name'].replace('{{SOLUTION_VERSION}}', solution_version)
+        git_folder = ws_config.get('connect_to_git_folder')
+
         print(f"\n--- Syncing {workspace_name} ---")
 
         # Get workspace ID
@@ -152,8 +157,32 @@ def main():
 
         print(f"  Workspace ID: {workspace_id}")
 
-        # Update from Git
-        success = update_workspace_from_git(workspace_id, workspace_name)
+        # Determine sync method based on template config
+        if git_folder:
+            # Workspace is connected to Git - use Git sync API
+            print(f"  Method: Git sync (folder: {git_folder})")
+            success = update_workspace_from_git(workspace_id, workspace_name)
+        else:
+            # Workspace not connected to Git - use Item Definition API
+            # Find the corresponding DEV workspace's git folder for item source
+            ws_type = workspace_name.split('-')[-1]  # e.g., 'processing', 'datastores'
+            dev_ws_name = f"{solution_version}-dev-{ws_type}"
+
+            # Look up the DEV workspace config to get its git folder
+            dev_ws_config = next(
+                (ws for ws in workspaces_config
+                 if ws.get('name', '').replace('{{SOLUTION_VERSION}}', solution_version) == dev_ws_name),
+                None
+            )
+
+            if dev_ws_config and dev_ws_config.get('connect_to_git_folder'):
+                items_source_path = dev_ws_config['connect_to_git_folder']
+                print(f"  Method: Item Definition API (source: {items_source_path})")
+                result = deploy_items_to_workspace(workspace_id, workspace_name, items_source_path)
+                success = len(result.get('failed', [])) == 0
+            else:
+                print(f"  ✗ Cannot determine item source path - no DEV workspace config found")
+                success = False
 
         if success:
             succeeded.append(workspace_name)
