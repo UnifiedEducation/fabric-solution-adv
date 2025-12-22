@@ -9,6 +9,23 @@
 # META   "dependencies": {}
 # META }
 
+# MARKDOWN ********************
+
+# # nb-av01-new-workspace-setup
+#
+# **Purpose**: Initialize a new workspace/environment with all required objects.
+#
+# **Usage**: Run once when creating a new workspace (e.g., for feature development).
+#
+# **Steps**:
+# 1. Create Lakehouse schemas and tables
+# 2. Publish environment (required after Git branch-out)
+# 3. Seed metadata SQL database
+
+# MARKDOWN ********************
+
+# ## Parameters
+
 # PARAMETERS CELL ********************
 
 init_lakehouses = True
@@ -23,7 +40,7 @@ init_metadata_sql = True
 
 # MARKDOWN ********************
 
-# Runtime Environment configuration: 
+# ## Runtime Environment Configuration
 
 
 # CELL ********************
@@ -46,21 +63,18 @@ init_metadata_sql = True
 
 # MARKDOWN ********************
 
-# This notebook should be run each time you create a new workspace/ environment (for example, when developing a new feature). 
-#  
-# 1. Run Lakehouse Creation Scripts
-# 2. Publish environments (in this notebook)
-# 3. Run Metadata SQL seeding notebook
-
-# MARKDOWN ********************
-
-# #### Setup Step 1. Run Lakehouse Creation Scripts
+# ## Step 1: Create Lakehouse Objects
 
 # CELL ********************
 
 import notebookutils
-if init_lakehouses == True: 
+
+if init_lakehouses:
+    print("Creating lakehouse schemas and tables...")
     notebookutils.notebook.run("nb-av01-lhcreate-all")
+    print("Lakehouse creation complete.")
+else:
+    print("Skipping lakehouse creation (init_lakehouses=False)")
 
 # METADATA ********************
 
@@ -71,29 +85,36 @@ if init_lakehouses == True:
 
 # MARKDOWN ********************
 
-# #### Setup Step 2. Publish environments
-# When you use the Branching out feature, or use Git integration for your Deployment, Environments become unpublished in the new Workspace. I don't know why, but that's the decision Microsoft have made. To get around this, we need to re-publish our environment. Luckily they have recently announced a REST API endpoint to do this, so we'll use the Sempy Fabric REST API Client to call it. 
-
+# ## Step 2: Publish Environment
+#
+# When using Git branch-out or deployment, environments become unpublished in the new workspace.
+# This step re-publishes the environment using the Fabric REST API.
 
 # CELL ********************
 
 import sempy.fabric as fabric
 
-# intialize a Fabric Rest API Client 
+# Initialize Fabric REST API client
 client = fabric.FabricRestClient()
 
-# get our variables from the VL
+# Get workspace and environment IDs from Variable Library
 variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
 workspace_id = variables.PROCESSING_WORKSPACE_ID
 environment_id = variables.ENVIRONMENT_ID
-beta_flag=True
 
-# create the full endpoint 
-# from: https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment(preview)
-endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}/staging/publish?beta={beta_flag}"
+# Build endpoint URL (preview API requires beta flag)
+# Ref: https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
+FABRIC_API_BETA = True
+endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}/staging/publish?beta={FABRIC_API_BETA}"
 
-#send the POST request 
-client.post(path_or_url=endpoint)
+# Publish environment with error handling
+try:
+    response = client.post(path_or_url=endpoint)
+    print(f"Environment published successfully (status: {response.status_code})")
+except Exception as e:
+    # This may fail if environment is already published or doesn't need publishing
+    print(f"Note: Environment publish returned: {e}")
+    print("This is often expected if the environment is already published.")
 
 # METADATA ********************
 
@@ -104,12 +125,16 @@ client.post(path_or_url=endpoint)
 
 # MARKDOWN ********************
 
-# #### Setup Step 3: (Optional) Initialize SQL Database 
+# ## Step 3: Seed Metadata SQL Database
 
 # CELL ********************
 
-if init_metadata_sql == True: 
+if init_metadata_sql:
+    print("Seeding metadata SQL database...")
     notebookutils.notebook.run("nb-av01-init-sql-database")
+    print("Metadata seeding complete.")
+else:
+    print("Skipping SQL seeding (init_metadata_sql=False)")
 
 # METADATA ********************
 

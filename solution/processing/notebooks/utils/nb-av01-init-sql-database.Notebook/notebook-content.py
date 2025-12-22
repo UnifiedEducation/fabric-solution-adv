@@ -9,10 +9,27 @@
 # META   "dependencies": {}
 # META }
 
+# MARKDOWN ********************
+
+# # nb-av01-init-sql-database
+#
+# **Purpose**: Seed the metadata SQL database with initial configuration data.
+#
+# **Usage**: Run once per new workspace/environment to populate metadata tables.
+#
+# **Dependencies**: Requires nb-av01-generic-functions (provides TimestampType, BooleanType, notebookutils)
+#
+# **Tables Seeded**:
+# - metadata.log_store, source_store, loading_store, transform_store, expectation_store, column_mappings
+# - instructions.ingestion, loading, transformations, validations
+
+# MARKDOWN ********************
+
+# ## Imports & Setup
+
 # CELL ********************
 
 %run nb-av01-generic-functions
-
 
 # METADATA ********************
 
@@ -23,6 +40,7 @@
 
 # CELL ********************
 
+# Additional imports (TimestampType, BooleanType available via generic-functions)
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
 
@@ -49,8 +67,15 @@ set_metadata_db_url(
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ## Metadata Store Definitions
+#
+# Configuration tables that define available functions, sources, and mappings.
+
 # CELL ********************
 
+# Log Store: Available logging functions (referenced by log_function_id)
 log_store_schema = StructType([
     StructField("log_id", IntegerType(), False),
     StructField("function_name", StringType(), False),
@@ -75,7 +100,7 @@ log_store_data = [
 
 # CELL ********************
 
-
+# Source Store: External data sources with connection details
 source_store_schema = StructType([
     StructField("source_id", IntegerType(), False),
     StructField("source_name", StringType(), False),
@@ -107,6 +132,7 @@ source_store_data = [
 
 # CELL ********************
 
+# Loading Store: Available loading functions for Raw->Bronze
 loading_store_schema = StructType([
     StructField("loading_id", IntegerType(), False),
     StructField("function_name", StringType(), False),
@@ -129,6 +155,7 @@ loading_store_data = [
 
 # CELL ********************
 
+# Transform Store: Available transform functions (referenced by transform_pipeline)
 transform_store_schema = StructType([
     StructField("transform_id", IntegerType(), False),
     StructField("function_name", StringType(), False),
@@ -167,6 +194,7 @@ transform_store_data = [
 
 # CELL ********************
 
+# Expectation Store: GX expectation types for validation (referenced by expectation_id)
 expectation_store_schema = StructType([
     StructField("expectation_id", IntegerType(), False),
     StructField("expectation_name", StringType(), False),
@@ -246,8 +274,15 @@ column_mappings_data = [
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ## Instruction Table Definitions
+#
+# Runtime instructions that control pipeline behavior.
+
 # CELL ********************
 
+# Ingestion Instructions: API endpoints to call during ingestion
 ingestion_schema = StructType([
     StructField("ingestion_id", IntegerType(), False),
     StructField("source_id", IntegerType(), False),
@@ -281,6 +316,7 @@ ingestion_data = [
 
 # CELL ********************
 
+# Loading Instructions: Raw->Bronze table loads
 loading_schema = StructType([
     StructField("loading_instr_id", IntegerType(), False),
     StructField("loading_id", IntegerType(), False),
@@ -329,6 +365,7 @@ loading_data = [
 
 # CELL ********************
 
+# Transformation Instructions: Bronze->Silver and Silver->Gold transforms
 transformations_schema = StructType([
     StructField("transform_instr_id", IntegerType(), False),
     StructField("source_table", StringType(), False),
@@ -400,6 +437,7 @@ transformations_data = [
 
 # CELL ********************
 
+# Validation Instructions: GX expectations to run on Gold tables
 validations_schema = StructType([
     StructField("validation_instr_id", IntegerType(), False),
     StructField("target_table", StringType(), False),
@@ -434,10 +472,28 @@ validations_data = [
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ## Seed Execution
+
 # CELL ********************
 
-def write_seed_table(table_name, schema, data):
-    """Helper function to write seed data to a SQL table."""
+def write_seed_table(table_name: str, schema: StructType, data: list) -> int:
+    """
+    Write seed data to a SQL metadata table.
+
+    Args:
+        table_name: Fully qualified table name (schema.table)
+        schema: PySpark StructType defining the table schema
+        data: List of tuples containing row data
+
+    Returns:
+        Number of rows written
+    """
+    if not data:
+        print(f"  Skipping {table_name} - no data to write")
+        return 0
+
     df = spark.createDataFrame(data, schema)
     df.write.mode("append").option("url", METADATA_DB_URL).mssql(table_name)
     print(f"  Wrote {len(data)} rows to {table_name}")
@@ -452,7 +508,7 @@ def write_seed_table(table_name, schema, data):
 
 # CELL ********************
 
-
+# Seed instruction tables
 instr_rows = 0
 
 # instructions schema tables
@@ -472,9 +528,8 @@ instr_rows += write_seed_table("instructions.validations", validations_schema, v
 
 # CELL ********************
 
+# Seed metadata store tables
 total_rows = 0
-
-# metadata schema tables
 total_rows += write_seed_table("metadata.log_store", log_store_schema, log_store_data)
 total_rows += write_seed_table("metadata.source_store", source_store_schema, source_store_data)
 total_rows += write_seed_table("metadata.loading_store", loading_store_schema, loading_store_data)

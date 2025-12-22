@@ -16,24 +16,23 @@
 
 # MARKDOWN ********************
 
-# # nb-av01-load
-# 
-# Metadata-driven loading notebook.
-# 
+# # nb-av01-1-load
+#
+# **Purpose**: Load raw JSON files into Bronze Delta tables using column mappings.
+#
 # **Stage**: Raw (Files) → Bronze (Delta tables)
-# 
-# **Queries**: `instructions.loading` + `metadata.loading_store`
-# 
-
+#
+# **Dependencies**: nb-av01-generic-functions
+#
+# **Metadata**: instructions.loading, metadata.loading_store, metadata.column_mappings
 
 # MARKDOWN ********************
 
-# **Import Generic & YouTube-specific tools (for the column mappings) Functions:**
+# ## Imports & Setup
 
 # CELL ********************
 
 %run nb-av01-generic-functions
-
 
 # METADATA ********************
 
@@ -44,6 +43,7 @@
 
 # MARKDOWN ********************
 
+# ## Configuration
 
 # CELL ********************
 
@@ -64,6 +64,7 @@ BRONZE_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.BR
 
 # MARKDOWN ********************
 
+# ## Load Metadata
 
 # CELL ********************
 
@@ -92,11 +93,12 @@ loading_instructions = get_active_instructions(spark, "loading", layer="bronze")
 
 # MARKDOWN ********************
 
+# ## Execute Loading
 
 # CELL ********************
 
 NOTEBOOK_NAME = "nb-av01-1-load"
-PIPELINE_NAME = "data_pipeline"  # Can be overridden via pipeline parameter
+PIPELINE_NAME = "data_pipeline"
 
 for instr in loading_instructions:
     # Capture start time for accurate duration tracking
@@ -146,9 +148,9 @@ for instr in loading_instructions:
                     spark=spark,
                     pipeline_name=PIPELINE_NAME,
                     notebook_name=NOTEBOOK_NAME,
-                    status="success",
+                    status=STATUS_SUCCESS,
                     rows_processed=row_count,
-                    action_type="loading",
+                    action_type=ACTION_LOADING,
                     source_name=instr["source_path"],
                     instruction_detail=instr["target_table"],
                     started_at=start_time
@@ -166,10 +168,10 @@ for instr in loading_instructions:
                     spark=spark,
                     pipeline_name=PIPELINE_NAME,
                     notebook_name=NOTEBOOK_NAME,
-                    status="failed",
+                    status=STATUS_FAILED,
                     rows_processed=0,
                     error_message=str(e),
-                    action_type="loading",
+                    action_type=ACTION_LOADING,
                     source_name=instr["source_path"],
                     instruction_detail=instr["target_table"],
                     started_at=start_time
