@@ -4,6 +4,8 @@ This module implements Microsoft's "Option 2" CI/CD pattern, allowing items
 to be deployed to workspaces that are not connected to Git. Items are read
 from the Git folder structure and pushed via the Item Definition API.
 
+Uses direct REST API calls instead of the Fabric CLI for better reliability.
+
 Supported item types:
 - Notebook (.Notebook/)
 - Lakehouse (.Lakehouse/)
@@ -15,49 +17,83 @@ Supported item types:
 
 import base64
 import json
-import tempfile
+import os
 import time
 from pathlib import Path
-from .utils import get_fabric_cli_path, run_command
+
+import requests
+
+# Fabric API base URL
+FABRIC_API_BASE = "https://api.fabric.microsoft.com/v1"
 
 
-def _call_fabric_api_with_body(endpoint, method, body):
+def _get_fabric_access_token():
     """
-    Call Fabric API with a request body, using a temp file to avoid command line length limits.
-
-    Args:
-        endpoint: API endpoint (e.g., 'workspaces/{id}/items')
-        method: HTTP method (e.g., 'post')
-        body: Request body dict
+    Get an access token for the Fabric API using service principal credentials.
 
     Returns:
-        tuple: (success: bool, response_json: dict)
+        str: Access token, or None if failed
     """
-    # Write body to temp file to avoid Windows command line length limits
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
-        json.dump(body, f)
-        temp_file = f.name
+    tenant_id = os.getenv('AZURE_TENANT_ID')
+    client_id = os.getenv('SPN_CLIENT_ID')
+    client_secret = os.getenv('SPN_CLIENT_SECRET')
+
+    if not all([tenant_id, client_id, client_secret]):
+        print("  Missing required environment variables for authentication")
+        return None
+
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    token_data = {
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'scope': 'https://api.fabric.microsoft.com/.default',
+        'grant_type': 'client_credentials'
+    }
 
     try:
-        result = run_command([
-            get_fabric_cli_path(), 'api', '-X', method,
-            endpoint, '-i', f'@{temp_file}'
-        ])
+        response = requests.post(token_url, data=token_data)
+        response.raise_for_status()
+        return response.json().get('access_token')
+    except requests.RequestException as e:
+        print(f"  Failed to get access token: {e}")
+        return None
 
-        if result.returncode != 0:
-            return False, {'error': result.stderr}
 
+def _fabric_api_request(method, endpoint, json_body=None):
+    """
+    Make a request to the Fabric REST API.
+
+    Args:
+        method: HTTP method ('GET', 'POST', etc.)
+        endpoint: API endpoint (e.g., 'workspaces/{id}/items')
+        json_body: Optional request body dict
+
+    Returns:
+        tuple: (success: bool, status_code: int, response_json: dict)
+    """
+    token = _get_fabric_access_token()
+    if not token:
+        return False, 0, {'error': 'Failed to get access token'}
+
+    url = f"{FABRIC_API_BASE}/{endpoint}"
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+
+    try:
+        response = requests.request(method, url, headers=headers, json=json_body)
+
+        # Parse response body if present
         try:
-            response_json = json.loads(result.stdout)
-            return True, response_json
-        except json.JSONDecodeError as e:
-            return False, {'error': f'Failed to parse response: {e}'}
-    finally:
-        # Clean up temp file
-        try:
-            Path(temp_file).unlink()
-        except OSError:
-            pass
+            response_json = response.json() if response.text else {}
+        except json.JSONDecodeError:
+            response_json = {'raw_response': response.text}
+
+        return True, response.status_code, response_json
+
+    except requests.RequestException as e:
+        return False, 0, {'error': str(e)}
 
 
 def list_workspace_items(workspace_id):
@@ -70,29 +106,23 @@ def list_workspace_items(workspace_id):
     Returns:
         dict: Mapping of {displayName: {id, type}} for all items in workspace
     """
-    result = run_command([
-        get_fabric_cli_path(), 'api', '-X', 'get',
-        f'workspaces/{workspace_id}/items'
-    ])
+    success, status_code, response = _fabric_api_request(
+        'GET', f'workspaces/{workspace_id}/items'
+    )
 
-    if result.returncode != 0:
-        print(f"  Failed to list workspace items: {result.stderr}")
+    if not success:
+        print(f"  Failed to list workspace items: {response.get('error')}")
         return {}
 
-    try:
-        response_json = json.loads(result.stdout)
-        if response_json.get('status_code') != 200:
-            print(f"  API returned status {response_json.get('status_code')}")
-            return {}
-
-        items = response_json.get('text', {}).get('value', [])
-        return {
-            item['displayName']: {'id': item['id'], 'type': item['type']}
-            for item in items
-        }
-    except (json.JSONDecodeError, KeyError) as e:
-        print(f"  Failed to parse items response: {e}")
+    if status_code != 200:
+        print(f"  API returned status {status_code}")
         return {}
+
+    items = response.get('value', [])
+    return {
+        item['displayName']: {'id': item['id'], 'type': item['type']}
+        for item in items
+    }
 
 
 def read_item_from_git(item_folder_path):
@@ -198,20 +228,17 @@ def create_item_with_definition(workspace_id, item_type, display_name, parts):
         }
     }
 
-    success, response_json = _call_fabric_api_with_body(
-        f'workspaces/{workspace_id}/items', 'post', request_body
+    success, status_code, response = _fabric_api_request(
+        'POST', f'workspaces/{workspace_id}/items', request_body
     )
 
     if not success:
-        print(f"  Failed to create item: {response_json.get('error', 'Unknown error')}")
+        print(f"  Failed to create item: {response.get('error', 'Unknown error')}")
         return None
-
-    status_code = response_json.get('status_code', 0)
 
     # 201 = created, 202 = accepted (long-running operation)
     if status_code in [201, 202]:
-        response_text = response_json.get('text', {})
-        item_id = response_text.get('id')
+        item_id = response.get('id')
 
         if status_code == 202:
             # Long-running operation - wait for completion
@@ -220,8 +247,7 @@ def create_item_with_definition(workspace_id, item_type, display_name, parts):
 
         return item_id
     else:
-        error = response_json.get('text', {})
-        print(f"  API returned status {status_code}: {error}")
+        print(f"  API returned status {status_code}: {response}")
         return None
 
 
@@ -244,16 +270,15 @@ def update_item_definition(workspace_id, item_id, parts):
     }
 
     # Include updateMetadata=true to update .platform metadata
-    success, response_json = _call_fabric_api_with_body(
+    success, status_code, response = _fabric_api_request(
+        'POST',
         f'workspaces/{workspace_id}/items/{item_id}/updateDefinition?updateMetadata=true',
-        'post', request_body
+        request_body
     )
 
     if not success:
-        print(f"  Failed to update item definition: {response_json.get('error', 'Unknown error')}")
+        print(f"  Failed to update item definition: {response.get('error', 'Unknown error')}")
         return False
-
-    status_code = response_json.get('status_code', 0)
 
     # 200 = success, 202 = accepted (long-running operation)
     if status_code in [200, 202]:
@@ -262,8 +287,7 @@ def update_item_definition(workspace_id, item_id, parts):
             time.sleep(2)
         return True
     else:
-        error = response_json.get('text', {})
-        print(f"  API returned status {status_code}: {error}")
+        print(f"  API returned status {status_code}: {response}")
         return False
 
 
@@ -385,10 +409,10 @@ def deploy_items_to_workspace(workspace_id, workspace_name, items_source_path):
         result = deploy_item(workspace_id, folder, existing_items)
 
         if result['success']:
-            print(f"  ✓ {result['action'].capitalize()}d: {result['displayName']}")
+            print(f"  + {result['action'].capitalize()}d: {result['displayName']}")
             succeeded.append(result['displayName'])
         else:
-            print(f"  ✗ {result['action'].capitalize()} failed: {result['displayName']} - {result['error']}")
+            print(f"  x {result['action'].capitalize()} failed: {result['displayName']} - {result['error']}")
             failed.append(result['displayName'])
 
     print(f"\n  Deployment complete: {len(succeeded)} succeeded, {len(failed)} failed")
