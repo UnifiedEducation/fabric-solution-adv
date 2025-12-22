@@ -35,21 +35,16 @@
 # MARKDOWN ********************
 
 # # nb-av01-unit-tests
-#
-# **Purpose**: Unit tests for core functions in nb-av01-generic-functions.
-#
-# **Usage**: Run manually to validate function behavior after changes.
-#
-# **Dependencies**: nb-av01-generic-functions
-#
-# **Test Coverage**:
+# # **Purpose**: Unit tests for core functions in nb-av01-generic-functions.
+# # **Usage**: Run manually to validate function behavior after changes.
+# # **Dependencies**: nb-av01-generic-functions
+# # **Test Coverage**:
 # - Path construction and layer mapping (pure functions)
 # - Transform functions (DataFrame operations)
 # - Surrogate key generation (critical dimensional modeling logic)
 # - GX expectation building (validation setup)
 # - Transform pipeline execution (orchestration logic)
-#
-# **Not Tested** (external dependencies):
+# # **Not Tested** (external dependencies):
 # - Metadata queries (require SQL database)
 # - Logging functions (require SQL database)
 # - File operations (require OneLake access)
@@ -217,8 +212,7 @@ def test_get_layer_lakehouse_invalid_raises():
 # MARKDOWN ********************
 
 # ## Transform Function Tests
-#
-# Tests for core DataFrame transformation functions used in pipeline processing.
+# # Tests for core DataFrame transformation functions used in pipeline processing.
 
 # CELL ********************
 
@@ -342,8 +336,7 @@ def test_add_literal_columns_applied_to_all_rows():
 # MARKDOWN ********************
 
 # ## Dedupe Function Tests
-#
-# Tests for window-based deduplication logic.
+# # Tests for window-based deduplication logic.
 
 # CELL ********************
 
@@ -420,8 +413,7 @@ def test_dedupe_by_window_no_duplicates():
 # MARKDOWN ********************
 
 # ## Surrogate Key Generation Tests
-#
-# Critical tests for dimensional modeling. Tests the core logic without Delta table dependencies.
+# # Critical tests for dimensional modeling. Tests the core logic without Delta table dependencies.
 
 # CELL ********************
 
@@ -544,8 +536,7 @@ def test_get_transform_function_returns_none_for_unknown():
 # MARKDOWN ********************
 
 # ## Transform Pipeline Tests
-#
-# Tests for the orchestration layer that chains transforms together.
+# # Tests for the orchestration layer that chains transforms together.
 
 # CELL ********************
 
@@ -659,8 +650,7 @@ def test_execute_transform_pipeline_empty_pipeline():
 # MARKDOWN ********************
 
 # ## GX Expectation Tests
-#
-# Tests for Great Expectations integration - building expectations from metadata.
+# # Tests for Great Expectations integration - building expectations from metadata.
 
 # CELL ********************
 
