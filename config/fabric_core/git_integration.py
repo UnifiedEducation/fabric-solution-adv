@@ -117,7 +117,7 @@ def update_workspace_from_git(workspace_id, workspace_name):
         "remoteCommitHash": remote_commit_hash,
         "conflictResolution": {
             "conflictResolutionType": "Workspace",
-            "conflictResolutionPolicy": "PreferWorkspace"
+            "conflictResolutionPolicy": "PreferRemote"
         },
         "options": {"allowOverrideItems": True}
     }
