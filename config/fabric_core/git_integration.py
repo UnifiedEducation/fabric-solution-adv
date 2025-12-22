@@ -104,7 +104,10 @@ def update_workspace_from_git(workspace_id, workspace_name):
             print(f"     Error: {error_text}")
             return False
 
-        remote_commit_hash = status_json.get('text', {}).get('remoteCommitHash')
+        git_status = status_json.get('text', {})
+        remote_commit_hash = git_status.get('remoteCommitHash')
+        workspace_head = git_status.get('workspaceHead')
+
         if not remote_commit_hash:
             print(f"  ⚠ No remoteCommitHash found in status")
             return False
@@ -112,7 +115,7 @@ def update_workspace_from_git(workspace_id, workspace_name):
         print(f"  ⚠ Failed to parse Git status")
         return False
 
-    # Update from Git using the remoteCommitHash
+    # Update from Git using the remoteCommitHash and workspaceHead
     update_request = {
         "remoteCommitHash": remote_commit_hash,
         "conflictResolution": {
@@ -121,6 +124,10 @@ def update_workspace_from_git(workspace_id, workspace_name):
         },
         "options": {"allowOverrideItems": True}
     }
+
+    # Include workspaceHead if available (required when workspace has local state)
+    if workspace_head:
+        update_request["workspaceHead"] = workspace_head
 
     update_response = run_command([
         get_fabric_cli_path(), 'api', '-X', 'post',
