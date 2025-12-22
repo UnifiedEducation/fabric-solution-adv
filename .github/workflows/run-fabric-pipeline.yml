@@ -1,0 +1,111 @@
+name: Run Fabric Pipeline
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      pipeline_id:
+        description: 'Pipeline Item ID (leave empty for default)'
+        required: false
+        type: string
+
+env:
+  POLL_INTERVAL: 30
+  CAPACITY_TIMEOUT: 600
+  PIPELINE_TIMEOUT: 7200
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Access Tokens
+        id: auth
+        run: |
+          # Fabric API token
+          FABRIC_TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.SPN_CLIENT_ID }}&client_secret=${{ secrets.SPN_CLIENT_SECRET }}&scope=https://api.fabric.microsoft.com/.default&grant_type=client_credentials" \
+            | grep -oP '"access_token"\s*:\s*"\K[^"]+')
+
+          # Azure Management API token
+          AZURE_TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.SPN_CLIENT_ID }}&client_secret=${{ secrets.SPN_CLIENT_SECRET }}&scope=https://management.azure.com/.default&grant_type=client_credentials" \
+            | grep -oP '"access_token"\s*:\s*"\K[^"]+')
+
+          echo "FABRIC_TOKEN=$FABRIC_TOKEN" >> $GITHUB_OUTPUT
+          echo "AZURE_TOKEN=$AZURE_TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Resume Capacity
+        run: |
+          curl -s -X POST "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.CAPACITY_NAME }}/resume?api-version=2023-11-01" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.AZURE_TOKEN }}" \
+            -H "Content-Length: 0"
+
+      - name: Wait for Capacity
+        run: |
+          URL="https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.CAPACITY_NAME }}?api-version=2023-11-01"
+          START=$(date +%s)
+
+          while true; do
+            ELAPSED=$(($(date +%s) - START))
+            [ $ELAPSED -ge $CAPACITY_TIMEOUT ] && echo "Timeout" && exit 1
+
+            STATUS=$(curl -s "$URL" -H "Authorization: Bearer ${{ steps.auth.outputs.AZURE_TOKEN }}")
+            echo "$STATUS" | grep -q '"state".*"Active"' && echo "Capacity Active" && break
+
+            echo "Waiting... (${ELAPSED}s)"
+            sleep $POLL_INTERVAL
+          done
+
+      - name: Run Pipeline
+        id: pipeline
+        run: |
+          PIPELINE_ID="${{ inputs.pipeline_id || vars.PIPELINE_ITEM_ID }}"
+          echo "Pipeline ID: $PIPELINE_ID"
+          echo "Workspace ID: ${{ vars.WORKSPACE_ID }}"
+
+          RESPONSE=$(curl -s -i -X POST "https://api.fabric.microsoft.com/v1/workspaces/${{ vars.WORKSPACE_ID }}/items/${PIPELINE_ID}/jobs/instances?jobType=Pipeline" \
+            -H "Authorization: Bearer ${{ steps.auth.outputs.FABRIC_TOKEN }}" \
+            -H "Content-Length: 0")
+
+          echo "Response:"
+          echo "$RESPONSE"
+
+          echo "$RESPONSE" | head -1 | grep -q "202" || (echo "Failed to trigger pipeline" && exit 1)
+
+          JOB_ID=$(echo "$RESPONSE" | grep -i "^location:" | grep -oP '[a-f0-9-]{36}$' | tr -d '\r')
+          echo "JOB_ID=$JOB_ID" >> $GITHUB_OUTPUT
+          echo "PIPELINE_ID=$PIPELINE_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for Pipeline
+        run: |
+          URL="https://api.fabric.microsoft.com/v1/workspaces/${{ vars.WORKSPACE_ID }}/items/${{ steps.pipeline.outputs.PIPELINE_ID }}/jobs/instances/${{ steps.pipeline.outputs.JOB_ID }}"
+          START=$(date +%s)
+
+          while true; do
+            ELAPSED=$(($(date +%s) - START))
+            [ $ELAPSED -ge $PIPELINE_TIMEOUT ] && echo "Timeout" && exit 1
+
+            RESPONSE=$(curl -s "$URL" -H "Authorization: Bearer ${{ steps.auth.outputs.FABRIC_TOKEN }}")
+            # Get only the first status field (top-level job status, not nested activity statuses)
+            STATUS=$(echo "$RESPONSE" | grep -oP '"status"\s*:\s*"\K[^"]+' | head -1)
+            echo "Status: $STATUS (${ELAPSED}s)"
+
+            case "$STATUS" in
+              Completed|Deduped) echo "Pipeline finished successfully"; exit 0 ;;
+              Failed|Cancelled) echo "Pipeline failed"; exit 1 ;;
+              *) sleep 60 ;;
+            esac
+          done
+
+      - name: Suspend Capacity
+        if: always()
+        run: |
+          # Get fresh token
+          TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.AZURE_TENANT_ID }}/oauth2/v2.0/token" \
+            -d "client_id=${{ secrets.SPN_CLIENT_ID }}&client_secret=${{ secrets.SPN_CLIENT_SECRET }}&scope=https://management.azure.com/.default&grant_type=client_credentials" \
+            | grep -oP '"access_token"\s*:\s*"\K[^"]+')
+
+          curl -s -X POST "https://management.azure.com/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.RESOURCE_GROUP }}/providers/Microsoft.Fabric/capacities/${{ vars.CAPACITY_NAME }}/suspend?api-version=2023-11-01" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Length: 0"
