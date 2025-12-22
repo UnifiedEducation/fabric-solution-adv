@@ -59,8 +59,8 @@ jobs:
             echo "Waiting for TEST engineering capacity... (${ELAPSED}s)"
             sleep $POLL_INTERVAL
           done
-          echo "Waiting 10s for Fabric API to be ready..."
-          sleep 10
+          echo "Waiting 30s for Fabric API to be ready..."
+          sleep 30
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -148,8 +148,8 @@ jobs:
             echo "Waiting for PROD engineering capacity... (${ELAPSED}s)"
             sleep $POLL_INTERVAL
           done
-          echo "Waiting 10s for Fabric API to be ready..."
-          sleep 10
+          echo "Waiting 30s for Fabric API to be ready..."
+          sleep 30
 
       - name: Checkout repository
         uses: actions/checkout@v4
