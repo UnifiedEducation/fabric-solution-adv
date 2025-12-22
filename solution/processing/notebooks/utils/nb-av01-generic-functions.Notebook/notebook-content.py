@@ -14,6 +14,24 @@
 # META   }
 # META }
 
+# CELL ********************
+
+# MAGIC %%configure -f
+# MAGIC {
+# MAGIC     "environment": {
+# MAGIC         "id": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_ID)"},
+# MAGIC         "name": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_NAME)"}
+# MAGIC     }
+# MAGIC }
+
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
 # MARKDOWN ********************
 
 # # PRJ106 Generic Functions Library
@@ -33,7 +51,6 @@
 
 # Standard library
 import json
-import os
 from datetime import datetime
 
 # Fabric/Spark
@@ -49,6 +66,40 @@ import great_expectations.expectations as gxe
 
 # HTTP
 import requests
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# MARKDOWN ********************
+
+# ## Constants
+# # Standardized values used across all pipeline notebooks.
+
+# CELL ********************
+
+# Pipeline status constants
+STATUS_SUCCESS = "success"
+STATUS_FAILED = "failed"
+STATUS_RUNNING = "running"
+
+# Action type constants
+ACTION_INGESTION = "ingestion"
+ACTION_LOADING = "loading"
+ACTION_TRANSFORMATION = "transformation"
+ACTION_VALIDATION = "validation"
+
+# Layer constants
+LAYER_RAW = "raw"
+LAYER_BRONZE = "bronze"
+LAYER_SILVER = "silver"
+LAYER_GOLD = "gold"
+
+# Valid layers for validation
+VALID_LAYERS = {LAYER_RAW, LAYER_BRONZE, LAYER_SILVER, LAYER_GOLD}
 
 # METADATA ********************
 
@@ -97,32 +148,67 @@ def set_metadata_db_url(server: str, database: str):
 def get_layer_lakehouse(layer: str, variables) -> str:
     """
     Map layer name to lakehouse from Variable Library.
-    Layer values come from instructions tables (source_layer, target_layer, dest_layer).
+
+    Args:
+        layer: Layer name ('raw', 'bronze', 'silver', 'gold')
+        variables: Variable Library object with lakehouse names
+
+    Returns:
+        Lakehouse name for the specified layer
+
+    Raises:
+        ValueError: If layer is not recognized
     """
     mapping = {
-        "raw": variables.BRONZE_LH_NAME,  # Raw files stored in Bronze LH Files area
-        "bronze": variables.BRONZE_LH_NAME,
-        "silver": variables.SILVER_LH_NAME,
-        "gold": variables.GOLD_LH_NAME
+        LAYER_RAW: variables.BRONZE_LH_NAME,  # Raw files stored in Bronze LH Files area
+        LAYER_BRONZE: variables.BRONZE_LH_NAME,
+        LAYER_SILVER: variables.SILVER_LH_NAME,
+        LAYER_GOLD: variables.GOLD_LH_NAME
     }
-    return mapping.get(layer)
+    result = mapping.get(layer)
+    if result is None:
+        raise ValueError(f"Unknown layer '{layer}'. Valid layers: {list(mapping.keys())}")
+    return result
 
 
 def construct_abfs_path(workspace: str, lakehouse: str, area: str = "Tables") -> str:
     """
     Build ABFS base path for a lakehouse.
-    area: 'Tables' for Delta tables, 'Files' for raw files
+
+    Args:
+        workspace: Workspace name
+        lakehouse: Lakehouse name
+        area: 'Tables' for Delta tables, 'Files' for raw files
+
+    Returns:
+        ABFS path string
+
+    Raises:
+        ValueError: If workspace or lakehouse is empty
     """
+    if not workspace or not lakehouse:
+        raise ValueError("workspace and lakehouse must not be empty")
     return f"abfss://{workspace}@onelake.dfs.fabric.microsoft.com/{lakehouse}.Lakehouse/{area}/"
 
 
 def get_most_recent_file(base_path: str, folder: str):
     """
     Find most recent file in folder by modifyTime.
-    Returns file object with .path attribute.
+
+    Args:
+        base_path: Base ABFS path
+        folder: Subfolder to search
+
+    Returns:
+        File object with .path attribute
+
+    Raises:
+        FileNotFoundError: If no files found in folder
     """
     full_path = f"{base_path}{folder}"
     files = notebookutils.fs.ls(full_path)
+    if not files:
+        raise FileNotFoundError(f"No files found in {full_path}")
     return max(files, key=lambda f: f.modifyTime)
 
 def get_api_key_from_keyvault(key_vault_url: str, secret_name: str) -> str:
@@ -496,7 +582,9 @@ def generate_surrogate_key(df, key_column_name: str, order_by_col: str,
                     F.col(natural_key).alias("_lookup_natural_key"),
                     F.col(key_column_name).alias("_existing_surrogate_id")
                 )
-        except:
+        except Exception as e:
+            # Table may not exist yet on first run - start from 0
+            print(f"  -> Note: Could not read max ID from {max_from_table}: {e}")
             max_id = 0
 
     if existing_lookup is not None and natural_key:
@@ -643,6 +731,79 @@ def merge_to_delta(spark, source_df, target_path: str, merge_condition: str,
         merge_builder.whenMatchedUpdate(set=update_set).whenNotMatchedInsert(values=insert_vals).execute()
 
     return source_df.count()
+
+
+def execute_pipeline_stage(spark, instructions: list, stage_executor,
+                           notebook_name: str, pipeline_name: str,
+                           action_type: str, log_lookup: dict):
+    """
+    Execute a metadata-driven pipeline stage with standardized logging.
+
+    Reduces code duplication across load, clean, and model notebooks by
+    centralizing the try/except/log pattern.
+
+    Args:
+        spark: SparkSession
+        instructions: List of instruction dicts from metadata
+        stage_executor: Callable(spark, instr) -> (row_count, source_name, detail)
+        notebook_name: Name of calling notebook for logging
+        pipeline_name: Pipeline identifier for logging
+        action_type: One of ACTION_LOADING, ACTION_TRANSFORMATION, etc.
+        log_lookup: Log store lookup dict from load_log_store()
+
+    Raises:
+        Exception: Re-raises any exception after logging failure
+    """
+    for instr in instructions:
+        start_time = datetime.now()
+        source_name = None
+        detail = None
+
+        try:
+            row_count, source_name, detail = stage_executor(spark, instr)
+
+            # Log success using metadata-driven function lookup
+            log_func_id = instr.get("log_function_id")
+            if log_func_id:
+                log_meta = log_lookup.get(log_func_id)
+                if log_meta:
+                    log_func = globals().get(log_meta["function_name"])
+                    if log_func:
+                        log_func(
+                            spark=spark,
+                            pipeline_name=pipeline_name,
+                            notebook_name=notebook_name,
+                            status=STATUS_SUCCESS,
+                            rows_processed=row_count,
+                            action_type=action_type,
+                            source_name=source_name,
+                            instruction_detail=detail,
+                            started_at=start_time
+                        )
+
+        except Exception as e:
+            print(f"  -> ERROR: {str(e)}")
+
+            # Log failure using metadata-driven function lookup
+            log_func_id = instr.get("log_function_id")
+            if log_func_id:
+                log_meta = log_lookup.get(log_func_id)
+                if log_meta:
+                    log_func = globals().get(log_meta["function_name"])
+                    if log_func:
+                        log_func(
+                            spark=spark,
+                            pipeline_name=pipeline_name,
+                            notebook_name=notebook_name,
+                            status=STATUS_FAILED,
+                            rows_processed=0,
+                            error_message=str(e),
+                            action_type=action_type,
+                            source_name=source_name,
+                            instruction_detail=detail,
+                            started_at=start_time
+                        )
+            raise
 
 # METADATA ********************
 

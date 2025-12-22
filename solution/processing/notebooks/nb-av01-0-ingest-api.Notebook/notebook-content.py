@@ -17,10 +17,13 @@
 # MARKDOWN ********************
 
 # # nb-av01-0-ingest-api
+# # **Purpose**: Ingest data from external REST APIs to the Raw landing zone.
+# # **Stage**: External APIs → Raw (Files in Bronze Lakehouse)
+# # **Dependencies**: nb-av01-generic-functions, nb-av01-api-tools-youtube
 
 # MARKDOWN ********************
 
-# Import Generic & Specific Tools
+# ## Imports & Setup
 
 # CELL ********************
 
@@ -46,7 +49,7 @@
 
 # MARKDOWN ********************
 
-# Load variables from Variable Library, and construct the ABFS path to the Raw Layer Lakehouse
+# ## Configuration
 
 # CELL ********************
 
@@ -66,7 +69,7 @@ RAW_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.BRONZ
 
 # MARKDOWN ********************
 
-# Load Metadata from the Fabric SQL
+# ## Load Metadata
 
 # CELL ********************
 
@@ -95,79 +98,7 @@ ingestion_instructions = get_active_instructions(spark, "ingestion")
 
 # MARKDOWN ********************
 
-# **API Ingestion Functions**
-# 
-# Source-specific ingestion logic. These handle pagination, authentication, and API quirks.
-
-# CELL ********************
-
-
-def ingest_rest_api(source_meta: dict, endpoint_path: str, 
-                    request_params: dict, landing_path: str) -> int:
-    """
-    Generic REST API ingestion with pagination support.
-    
-    Returns: Total items fetched
-    """
-    # Get authentication
-    if source_meta["auth_method"] == "api_key":
-        api_key = get_api_key_from_keyvault(
-            source_meta["key_vault_url"],
-            source_meta["secret_name"]
-        )
-        request_params["key"] = api_key
-    
-    # Build full URL
-    base_url = source_meta["base_url"].rstrip("/")
-    url = f"{base_url}{endpoint_path}"
-    
-    # Fetch with pagination
-    all_items = []
-    page_token = None
-    
-    while True:
-        params = request_params.copy()
-        if page_token:
-            params["pageToken"] = page_token
-        
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
-        
-        # Collect items
-        if "items" in data:
-            all_items.extend(data["items"])
-        else:
-            # Single item response (e.g., channel details)
-            all_items.append(data)
-        
-        # Check for next page
-        page_token = data.get("nextPageToken")
-        if not page_token:
-            break
-    
-    # Save to landing zone
-    output_path = f"{RAW_BASE_PATH}{landing_path}"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_path = f"{output_path}{timestamp}.json"
-    
-    # Write JSON file
-    output_data = {"items": all_items} if len(all_items) > 1 else all_items[0]
-    json_content = json.dumps(output_data, indent=2)
-    notebookutils.fs.put(file_path, json_content, overwrite=True)
-    
-    return len(all_items)
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# MARKDOWN ********************
-
-# **Execute Ingestion Instructions**
+# ## Execute Ingestion
 
 # CELL ********************
 
@@ -249,9 +180,9 @@ for instr in ingestion_instructions:
                     spark=spark,
                     pipeline_name=PIPELINE_NAME,
                     notebook_name=NOTEBOOK_NAME,
-                    status="success",
+                    status=STATUS_SUCCESS,
                     rows_processed=item_count,
-                    action_type="ingestion",
+                    action_type=ACTION_INGESTION,
                     source_name=source_meta["source_name"],
                     instruction_detail=instr["endpoint_path"],
                     started_at=start_time
@@ -269,10 +200,10 @@ for instr in ingestion_instructions:
                     spark=spark,
                     pipeline_name=PIPELINE_NAME,
                     notebook_name=NOTEBOOK_NAME,
-                    status="failed",
+                    status=STATUS_FAILED,
                     rows_processed=0,
                     error_message=str(e),
-                    action_type="ingestion",
+                    action_type=ACTION_INGESTION,
                     source_name=source_meta["source_name"] if source_meta else None,
                     instruction_detail=instr["endpoint_path"],
                     started_at=start_time

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Notebook",
+    "displayName": "nb-av01-new-workspace-setup"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "3a33768a-0c42-b8cd-42d7-0ffd587c9428"
+  }
+}

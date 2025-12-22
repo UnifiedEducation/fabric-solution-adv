@@ -11,23 +11,20 @@
 
 # MARKDOWN ********************
 
-# #### PRJ105 ⬛ ADV Project (Sprint 5): Lakehouse Development - ALL TABLES
-# > The code in this notebook is written as part of Week 5 of the Advanced Project, in [Fabric Dojo](https://skool.com/fabricdojo/about).
-# 
-# #### Step 1: Getting our variables
-# Firstly, we need to get the variables from the variable library, so that our code will function no matter which workspace it is being called from. 
-# 
-# In this context, we are using the Spark-SQL four-part naming structure: 
-# \`workspace_name\`.lakehouse_name.schema_name.table_name 
-# 
-# _Note: if your workspace name contains hyphens (rather than underscore), then you must use \` backtick to wrap around the workspace name._
+# # nb-av01-lhcreate-all
+# # **Purpose**: Create all lakehouse schemas and tables for Bronze, Silver, and Gold layers.
+# # **Usage**: Run via nb-av01-new-workspace-setup or directly for lakehouse initialization.
+# # **Naming**: Uses Spark-SQL four-part naming: `workspace`.`lakehouse`.`schema`.`table`
+
+# MARKDOWN ********************
+
+# ## Setup
 
 # CELL ********************
 
-import notebookutils 
+import notebookutils
 
 variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
-
 lh_workspace_name = variables.LH_WORKSPACE_NAME
 
 
@@ -40,10 +37,8 @@ lh_workspace_name = variables.LH_WORKSPACE_NAME
 
 # MARKDOWN ********************
 
-# #### Step 2: Define some metadata
-# I just took the metadata from each of the three notebooks, and combined it into one Python object. 
-# 
-# We will build this into our metadata framework in a later Sprint - for now - this is good enough! 
+# ## Lakehouse Schema Definitions
+# # Table definitions for each layer (Bronze, Silver, Gold).
 
 # CELL ********************
 
@@ -145,32 +140,30 @@ LAKEHOUSE_METADATA = {
 
 # MARKDOWN ********************
 
-# #### Step 3: Define function
-# Our function takes the lakehouse config as input (from the METADATA), and performs the Schema Creation and Table Creation, as per the metadata config. 
+# ## Create Objects
 
 # CELL ********************
 
-def create_lakehouse_objects(lakehouse_config):
+def create_lakehouse_objects(layer_name: str, lakehouse_config: dict):
     """
-    Creates schemas and tables for a lakehouse based on configuration.
-    
+    Create schemas and tables for a lakehouse based on configuration.
+
     Args:
-        lakehouse_config: Dictionary containing lakehouse metadata
+        layer_name: Layer identifier (bronze, silver, gold) for logging
+        lakehouse_config: Dict with name_variable, schemas, and tables keys
     """
-    # Get lakehouse name from variables
     lh_name = getattr(variables, lakehouse_config["name_variable"])
-    
+    print(f"Creating objects for {layer_name} layer ({lh_name})...")
+
     # Create schemas
     for schema_name in lakehouse_config["schemas"]:
         spark.sql(f"CREATE SCHEMA IF NOT EXISTS `{lh_workspace_name}`.`{lh_name}`.`{schema_name}`")
-    
+        print(f"  Schema: {schema_name}")
+
     # Create tables
     for table, ddl in lakehouse_config["tables"].items():
-        create_script = f"CREATE TABLE IF NOT EXISTS `{lh_workspace_name}`.`{lh_name}`.{table} ({ddl});"
-        spark.sql(create_script)
-
-
-
+        spark.sql(f"CREATE TABLE IF NOT EXISTS `{lh_workspace_name}`.`{lh_name}`.{table} ({ddl});")
+        print(f"  Table: {table}")
 
 # METADATA ********************
 
@@ -179,15 +172,13 @@ def create_lakehouse_objects(lakehouse_config):
 # META   "language_group": "synapse_pyspark"
 # META }
 
-# MARKDOWN ********************
-
-# #### Step 4: Loop through the metadata, and run the function 
-
 # CELL ********************
 
 # Process all lakehouses
-for lakehouse_name, lakehouse_config in LAKEHOUSE_METADATA.items():
-    create_lakehouse_objects(lakehouse_config)
+for layer_name, lakehouse_config in LAKEHOUSE_METADATA.items():
+    create_lakehouse_objects(layer_name, lakehouse_config)
+
+print("\nLakehouse creation complete.")
 
 # METADATA ********************
 

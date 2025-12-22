@@ -13,6 +13,7 @@ from .auth import auth
 from .workspace import workspace_exists, get_workspace_id, create_workspace, assign_permissions, get_workspace_role_assignments
 from .capacity import capacity_exists, create_capacity, suspend_capacity
 from .git_integration import get_or_create_git_connection, connect_workspace_to_git, update_workspace_from_git
+from .job_scheduler import run_notebook, get_job_status, get_item_id
 from .utils import get_fabric_cli_path, run_command, call_azure_api, load_config
 
 __all__ = [
@@ -27,6 +28,9 @@ __all__ = [
     'get_or_create_git_connection',
     'connect_workspace_to_git',
     'update_workspace_from_git',
+    'run_notebook',
+    'get_job_status',
+    'get_item_id',
     'get_fabric_cli_path',
     'run_command',
     'call_azure_api',

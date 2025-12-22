@@ -19,6 +19,18 @@
 # META   }
 # META }
 
+# MARKDOWN ********************
+
+# # nb-av01-3-model
+# # **Purpose**: Transform Silver data to Gold using business modeling rules.
+# # **Stage**: Silver → Gold
+# # **Dependencies**: nb-av01-generic-functions
+# # **Metadata**: instructions.transformations (dest_layer='gold'), metadata.transform_store
+
+# MARKDOWN ********************
+
+# ## Imports & Setup
+
 # CELL ********************
 
 %run nb-av01-generic-functions
@@ -30,12 +42,16 @@
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ## Configuration
+
 # CELL ********************
 
 # Load workspace-specific variables from Variable Library
 variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
 
-# Build base paths for all lakehouses
+# Build base paths for Silver and Gold lakehouses
 SILVER_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.SILVER_LH_NAME, area="Tables")
 GOLD_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.GOLD_LH_NAME, area="Tables")
 
@@ -45,6 +61,10 @@ GOLD_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.GOLD
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
 # META }
+
+# MARKDOWN ********************
+
+# ## Load Metadata
 
 # CELL ********************
 
@@ -70,22 +90,22 @@ transform_instructions = get_active_instructions(spark, "transformations", layer
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ## Execute Transformations
+
 # CELL ********************
 
 NOTEBOOK_NAME = "nb-av01-3-model"
-PIPELINE_NAME = "data_pipeline"  # Can be overridden via pipeline parameter
+PIPELINE_NAME = "data_pipeline"
 
 for instr in transform_instructions:
-    # Capture start time for accurate duration tracking
     start_time = datetime.now()
 
     try:
-        # Build paths using layer info
-        source_lh = get_layer_lakehouse(instr["source_layer"], variables)
-        dest_lh = get_layer_lakehouse(instr["dest_layer"], variables)
-
-        source_path = construct_abfs_path(variables.LH_WORKSPACE_NAME, source_lh) + instr["source_table"]
-        dest_path = construct_abfs_path(variables.LH_WORKSPACE_NAME, dest_lh) + instr["dest_table"]
+        # Build paths using pre-built base paths
+        source_path = SILVER_BASE_PATH + instr["source_table"]
+        dest_path = GOLD_BASE_PATH + instr["dest_table"]
 
         print(f"Modeling: {instr['source_table']} -> {instr['dest_table']}")
 
@@ -134,9 +154,9 @@ for instr in transform_instructions:
                     spark=spark,
                     pipeline_name=PIPELINE_NAME,
                     notebook_name=NOTEBOOK_NAME,
-                    status="success",
+                    status=STATUS_SUCCESS,
                     rows_processed=row_count,
-                    action_type="transformation",
+                    action_type=ACTION_TRANSFORMATION,
                     source_name=instr["source_table"],
                     instruction_detail=instr["dest_table"],
                     started_at=start_time
@@ -154,25 +174,15 @@ for instr in transform_instructions:
                     spark=spark,
                     pipeline_name=PIPELINE_NAME,
                     notebook_name=NOTEBOOK_NAME,
-                    status="failed",
+                    status=STATUS_FAILED,
                     rows_processed=0,
                     error_message=str(e),
-                    action_type="transformation",
+                    action_type=ACTION_TRANSFORMATION,
                     source_name=instr["source_table"],
                     instruction_detail=instr["dest_table"],
                     started_at=start_time
                 )
         raise
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
 
 # METADATA ********************
 

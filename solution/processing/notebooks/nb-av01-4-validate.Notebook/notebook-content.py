@@ -14,6 +14,18 @@
 # META   }
 # META }
 
+# MARKDOWN ********************
+
+# # nb-av01-4-validate
+# # **Purpose**: Run Great Expectations validations on Gold layer tables.
+# # **Stage**: Gold (validation only)
+# # **Dependencies**: nb-av01-generic-functions
+# # **Metadata**: instructions.validations, metadata.expectation_store
+
+# MARKDOWN ********************
+
+# ## Imports & Setup
+
 # CELL ********************
 
 %run nb-av01-generic-functions
@@ -24,6 +36,10 @@
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
 # META }
+
+# MARKDOWN ********************
+
+# ## Configuration
 
 # CELL ********************
 
@@ -39,6 +55,10 @@ GOLD_BASE_PATH = construct_abfs_path(variables.LH_WORKSPACE_NAME, variables.GOLD
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
 # META }
+
+# MARKDOWN ********************
+
+# ## Load Metadata
 
 # CELL ********************
 
@@ -63,6 +83,10 @@ validation_instructions = get_active_instructions(spark, "validations", layer="g
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ## Initialize Great Expectations
+
 # CELL ********************
 
 # Create ephemeral GX context for Fabric
@@ -78,10 +102,14 @@ datasource = context.data_sources.add_spark(name="spark_datasource")
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# MARKDOWN ********************
+
+# ## Execute Validations
+
 # CELL ********************
 
 NOTEBOOK_NAME = "nb-av01-4-validate"
-PIPELINE_NAME = "data_pipeline"  # Can be overridden via pipeline parameter
+PIPELINE_NAME = "data_pipeline"
 
 # Group validations by target table
 validations_by_table = {}
@@ -143,14 +171,14 @@ for table_name, table_validations in validations_by_table.items():
         asset_name = f"{table_name.replace('/', '_')}_asset"
         try:
             asset = datasource.get_asset(asset_name)
-        except:
+        except LookupError:
             asset = datasource.add_dataframe_asset(name=asset_name)
 
         # Get or create batch definition (idempotent)
         batch_def_name = "batch_def"
         try:
             batch_definition = asset.get_batch_definition(batch_def_name)
-        except:
+        except LookupError:
             batch_definition = asset.add_batch_definition_whole_dataframe(name=batch_def_name)
 
         batch = batch_definition.get_batch(batch_parameters={"dataframe": df})
@@ -184,9 +212,9 @@ for table_name, table_validations in validations_by_table.items():
             spark=spark,
             pipeline_name=PIPELINE_NAME,
             notebook_name=NOTEBOOK_NAME,
-            status="success" if passed else "failed",
+            status=STATUS_SUCCESS if passed else STATUS_FAILED,
             rows_processed=row_count,
-            action_type="validation",
+            action_type=ACTION_VALIDATION,
             instruction_detail=table_name,
             started_at=start_time
         )
@@ -212,10 +240,10 @@ for table_name, table_validations in validations_by_table.items():
             spark=spark,
             pipeline_name=PIPELINE_NAME,
             notebook_name=NOTEBOOK_NAME,
-            status="failed",
+            status=STATUS_FAILED,
             rows_processed=0,
             error_message=str(e),
-            action_type="validation",
+            action_type=ACTION_VALIDATION,
             instruction_detail=table_name,
             started_at=start_time
         )
