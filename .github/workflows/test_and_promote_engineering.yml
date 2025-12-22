@@ -1,3 +1,11 @@
+# Test and Promote Engineering Workloads
+#
+# Deploys items to TEST/PROD workspaces using Item Definition API (Option 2 CI/CD).
+# TEST/PROD workspaces are not connected to Git - items are pushed from the Git repo
+# using Fabric's Item Definition API.
+#
+# Flow: Git Repo -> TEST Workspace (via API) -> Run Tests -> PROD Workspace (via API)
+
 name: Test and Promote Engineering Workloads
 
 on:

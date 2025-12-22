@@ -1,3 +1,10 @@
+# Sync Dev Engineering Workspaces
+#
+# Triggered when a PR is merged to main. Syncs DEV workspaces from Git
+# using the Git sync API (DEV workspaces are connected to Git).
+#
+# Flow: PR merged to main -> DEV Workspaces updated via Git sync
+
 name: Sync Dev Engineering Workspaces
 
 on:
@@ -34,6 +41,8 @@ jobs:
           GITHUB_ACTIONS: true
           PYTHONUTF8: 1
           PYTHONIOENCODING: utf-8
+          TARGET_ENVIRONMENT: dev
+          WORKSPACES_TO_SYNC: processing,datastores
         run: |
           chcp 65001
-          python config/scripts/sync_dev_workspaces_from_main.py
+          python config/scripts/sync_environment_workspaces.py
