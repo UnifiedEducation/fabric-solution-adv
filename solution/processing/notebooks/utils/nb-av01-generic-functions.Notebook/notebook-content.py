@@ -77,8 +77,7 @@ import requests
 # MARKDOWN ********************
 
 # ## Constants
-#
-# Standardized values used across all pipeline notebooks.
+# # Standardized values used across all pipeline notebooks.
 
 # CELL ********************
 

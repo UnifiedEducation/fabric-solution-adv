@@ -12,14 +12,10 @@
 # MARKDOWN ********************
 
 # # nb-av01-init-sql-database
-#
-# **Purpose**: Seed the metadata SQL database with initial configuration data.
-#
-# **Usage**: Run once per new workspace/environment to populate metadata tables.
-#
-# **Dependencies**: Requires nb-av01-generic-functions (provides TimestampType, BooleanType, notebookutils)
-#
-# **Tables Seeded**:
+# # **Purpose**: Seed the metadata SQL database with initial configuration data.
+# # **Usage**: Run once per new workspace/environment to populate metadata tables.
+# # **Dependencies**: Requires nb-av01-generic-functions (provides TimestampType, BooleanType, notebookutils)
+# # **Tables Seeded**:
 # - metadata.log_store, source_store, loading_store, transform_store, expectation_store, column_mappings
 # - instructions.ingestion, loading, transformations, validations
 
@@ -70,8 +66,7 @@ set_metadata_db_url(
 # MARKDOWN ********************
 
 # ## Metadata Store Definitions
-#
-# Configuration tables that define available functions, sources, and mappings.
+# # Configuration tables that define available functions, sources, and mappings.
 
 # CELL ********************
 
@@ -277,8 +272,7 @@ column_mappings_data = [
 # MARKDOWN ********************
 
 # ## Instruction Table Definitions
-#
-# Runtime instructions that control pipeline behavior.
+# # Runtime instructions that control pipeline behavior.
 
 # CELL ********************
 
