@@ -15,9 +15,49 @@ Supported item types:
 
 import base64
 import json
+import tempfile
 import time
 from pathlib import Path
 from .utils import get_fabric_cli_path, run_command
+
+
+def _call_fabric_api_with_body(endpoint, method, body):
+    """
+    Call Fabric API with a request body, using a temp file to avoid command line length limits.
+
+    Args:
+        endpoint: API endpoint (e.g., 'workspaces/{id}/items')
+        method: HTTP method (e.g., 'post')
+        body: Request body dict
+
+    Returns:
+        tuple: (success: bool, response_json: dict)
+    """
+    # Write body to temp file to avoid Windows command line length limits
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as f:
+        json.dump(body, f)
+        temp_file = f.name
+
+    try:
+        result = run_command([
+            get_fabric_cli_path(), 'api', '-X', method,
+            endpoint, '-i', f'@{temp_file}'
+        ])
+
+        if result.returncode != 0:
+            return False, {'error': result.stderr}
+
+        try:
+            response_json = json.loads(result.stdout)
+            return True, response_json
+        except json.JSONDecodeError as e:
+            return False, {'error': f'Failed to parse response: {e}'}
+    finally:
+        # Clean up temp file
+        try:
+            Path(temp_file).unlink()
+        except OSError:
+            pass
 
 
 def list_workspace_items(workspace_id):
@@ -158,38 +198,30 @@ def create_item_with_definition(workspace_id, item_type, display_name, parts):
         }
     }
 
-    result = run_command([
-        get_fabric_cli_path(), 'api', '-X', 'post',
-        f'workspaces/{workspace_id}/items',
-        '-i', json.dumps(request_body)
-    ])
+    success, response_json = _call_fabric_api_with_body(
+        f'workspaces/{workspace_id}/items', 'post', request_body
+    )
 
-    if result.returncode != 0:
-        print(f"  Failed to create item: {result.stderr}")
+    if not success:
+        print(f"  Failed to create item: {response_json.get('error', 'Unknown error')}")
         return None
 
-    try:
-        response_json = json.loads(result.stdout)
-        status_code = response_json.get('status_code', 0)
+    status_code = response_json.get('status_code', 0)
 
-        # 201 = created, 202 = accepted (long-running operation)
-        if status_code in [201, 202]:
-            response_text = response_json.get('text', {})
-            item_id = response_text.get('id')
+    # 201 = created, 202 = accepted (long-running operation)
+    if status_code in [201, 202]:
+        response_text = response_json.get('text', {})
+        item_id = response_text.get('id')
 
-            if status_code == 202:
-                # Long-running operation - wait for completion
-                print(f"  Item creation in progress...")
-                time.sleep(5)  # Brief wait for async creation
+        if status_code == 202:
+            # Long-running operation - wait for completion
+            print(f"  Item creation in progress...")
+            time.sleep(5)  # Brief wait for async creation
 
-            return item_id
-        else:
-            error = response_json.get('text', {})
-            print(f"  API returned status {status_code}: {error}")
-            return None
-
-    except json.JSONDecodeError as e:
-        print(f"  Failed to parse response: {e}")
+        return item_id
+    else:
+        error = response_json.get('text', {})
+        print(f"  API returned status {status_code}: {error}")
         return None
 
 
@@ -212,33 +244,26 @@ def update_item_definition(workspace_id, item_id, parts):
     }
 
     # Include updateMetadata=true to update .platform metadata
-    result = run_command([
-        get_fabric_cli_path(), 'api', '-X', 'post',
+    success, response_json = _call_fabric_api_with_body(
         f'workspaces/{workspace_id}/items/{item_id}/updateDefinition?updateMetadata=true',
-        '-i', json.dumps(request_body)
-    ])
+        'post', request_body
+    )
 
-    if result.returncode != 0:
-        print(f"  Failed to update item definition: {result.stderr}")
+    if not success:
+        print(f"  Failed to update item definition: {response_json.get('error', 'Unknown error')}")
         return False
 
-    try:
-        response_json = json.loads(result.stdout)
-        status_code = response_json.get('status_code', 0)
+    status_code = response_json.get('status_code', 0)
 
-        # 200 = success, 202 = accepted (long-running operation)
-        if status_code in [200, 202]:
-            if status_code == 202:
-                print(f"  Update in progress...")
-                time.sleep(2)
-            return True
-        else:
-            error = response_json.get('text', {})
-            print(f"  API returned status {status_code}: {error}")
-            return False
-
-    except json.JSONDecodeError as e:
-        print(f"  Failed to parse response: {e}")
+    # 200 = success, 202 = accepted (long-running operation)
+    if status_code in [200, 202]:
+        if status_code == 202:
+            print(f"  Update in progress...")
+            time.sleep(2)
+        return True
+    else:
+        error = response_json.get('text', {})
+        print(f"  API returned status {status_code}: {error}")
         return False
 
 
