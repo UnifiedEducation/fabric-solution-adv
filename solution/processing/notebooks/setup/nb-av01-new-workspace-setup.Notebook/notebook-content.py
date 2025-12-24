@@ -37,30 +37,9 @@ init_metadata_sql = True
 
 # MARKDOWN ********************
 
-# ## Runtime Environment Configuration
-
-
-# CELL ********************
-
-# MAGIC %%configure -f
-# MAGIC {
-# MAGIC     "environment": {
-# MAGIC         "id": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_ID)"},
-# MAGIC         "name": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_NAME)"}
-# MAGIC     }
-# MAGIC }
-
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# MARKDOWN ********************
-
 # ## Step 1: Create Lakehouse Objects
+# # Note: %%configure removed - this notebook orchestrates child notebooks which have their own environment config.
+# Child notebooks handle their own environment attachment.
 
 # CELL ********************
 
@@ -93,24 +72,38 @@ import sempy.fabric as fabric
 # Initialize Fabric REST API client
 client = fabric.FabricRestClient()
 
-# Get workspace and environment IDs from Variable Library
-variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
-workspace_id = variables.PROCESSING_WORKSPACE_ID
-environment_id = variables.ENVIRONMENT_ID
+# Get workspace ID from runtime context (works for fresh deployments)
+workspace_id = notebookutils.runtime.context["currentWorkspaceId"]
+print(f"Workspace ID: {workspace_id}")
 
-# Build endpoint URL (preview API requires beta flag)
-# Ref: https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
-FABRIC_API_BETA = True
-endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}/staging/publish?beta={FABRIC_API_BETA}"
+# Find environment ID by querying workspace items
+ENV_NAME = "env-av01-dataeng"
+response = client.get(f"v1/workspaces/{workspace_id}/items")
+items = response.json().get("value", [])
+environment_id = None
+for item in items:
+    if item.get("displayName") == ENV_NAME and item.get("type") == "Environment":
+        environment_id = item.get("id")
+        break
 
-# Publish environment with error handling
-try:
-    response = client.post(path_or_url=endpoint)
-    print(f"Environment published successfully (status: {response.status_code})")
-except Exception as e:
-    # This may fail if environment is already published or doesn't need publishing
-    print(f"Note: Environment publish returned: {e}")
-    print("This is often expected if the environment is already published.")
+if not environment_id:
+    print(f"Warning: Environment '{ENV_NAME}' not found in workspace. Skipping publish.")
+else:
+    print(f"Environment ID: {environment_id}")
+
+    # Build endpoint URL (preview API requires beta flag)
+    # Ref: https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
+    FABRIC_API_BETA = True
+    endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}/staging/publish?beta={FABRIC_API_BETA}"
+
+    # Publish environment with error handling
+    try:
+        response = client.post(path_or_url=endpoint)
+        print(f"Environment published successfully (status: {response.status_code})")
+    except Exception as e:
+        # This may fail if environment is already published or doesn't need publishing
+        print(f"Note: Environment publish returned: {e}")
+        print("This is often expected if the environment is already published.")
 
 # METADATA ********************
 
