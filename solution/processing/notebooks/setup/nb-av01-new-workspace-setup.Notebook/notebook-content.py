@@ -138,3 +138,23 @@ else:
 # META   "language": "python",
 # META   "language_group": "synapse_pyspark"
 # META }
+
+# MARKDOWN ********************
+
+# ## Step 4: Configure Variable Library
+# # Auto-configure variable library with workspace-specific item IDs.
+# This updates the value set (DEV/TEST/PROD) with discovered notebook IDs,
+# SQL database connection info, and other environment-specific values.
+
+# CELL ********************
+
+print("Configuring variable library with workspace-specific values...")
+notebookutils.notebook.run("nb-av01-configure-variables")
+print("Variable library configuration complete.")
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }

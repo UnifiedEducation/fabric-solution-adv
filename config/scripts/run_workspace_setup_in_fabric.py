@@ -1,8 +1,12 @@
 """
-Run unit tests in a Fabric workspace.
+Run workspace setup notebook in a Fabric workspace.
 
-This script is called from GitHub Actions to execute the unit test notebook
-in a specified workspace and return success/failure based on test results.
+This script is called from GitHub Actions after deploying items to TEST/PROD
+workspaces. It executes the nb-av01-new-workspace-setup notebook which:
+1. Creates lakehouse schemas and tables
+2. Publishes the environment
+3. Seeds metadata SQL database
+4. Configures variable library with workspace-specific values
 """
 
 # fmt: off
@@ -28,8 +32,8 @@ if sys.stdout.encoding != 'utf-8':
 
 
 # Configuration
-UNIT_TEST_NOTEBOOK_PATH = "nb-av01-unit-tests.Notebook"
-NOTEBOOK_TIMEOUT = 600  # 10 minutes
+SETUP_NOTEBOOK_PATH = "nb-av01-new-workspace-setup.Notebook"
+NOTEBOOK_TIMEOUT = 900  # 15 minutes (setup takes longer than unit tests)
 
 
 def main():
@@ -38,11 +42,14 @@ def main():
         load_dotenv(Path(__file__).parent.parent.parent / '.env')
 
     # Get workspace name from environment (set by GitHub Actions)
-    workspace_name = os.getenv('TEST_WORKSPACE_NAME', 'av01-test-processing')
+    workspace_name = os.getenv('SETUP_WORKSPACE_NAME')
+    if not workspace_name:
+        print("Error: SETUP_WORKSPACE_NAME environment variable not set")
+        sys.exit(1)
 
-    print("=== RUNNING UNIT TESTS IN FABRIC ===")
+    print("=== RUNNING WORKSPACE SETUP IN FABRIC ===")
     print(f"Workspace: {workspace_name}")
-    print(f"Notebook: {UNIT_TEST_NOTEBOOK_PATH}")
+    print(f"Notebook: {SETUP_NOTEBOOK_PATH}")
 
     # Authenticate
     print("\n--- Authenticating ---")
@@ -60,9 +67,9 @@ def main():
 
     # Get notebook ID
     print("\n--- Getting notebook ID ---")
-    notebook_id = get_item_id(workspace_name, UNIT_TEST_NOTEBOOK_PATH)
+    notebook_id = get_item_id(workspace_name, SETUP_NOTEBOOK_PATH)
     if not notebook_id:
-        print(f"✗ Notebook not found: {UNIT_TEST_NOTEBOOK_PATH}")
+        print(f"✗ Notebook not found: {SETUP_NOTEBOOK_PATH}")
         sys.exit(1)
     print(f"✓ Notebook ID: {notebook_id}")
 
@@ -81,10 +88,10 @@ def main():
     print(f"Job ID: {result['job_id']}")
 
     if result['success']:
-        print("\n✓ Unit tests PASSED")
+        print("\n✓ Workspace setup COMPLETED")
         sys.exit(0)
     else:
-        print(f"\n✗ Unit tests FAILED")
+        print(f"\n✗ Workspace setup FAILED")
         if result['error']:
             print(f"Error: {result['error']}")
         sys.exit(1)

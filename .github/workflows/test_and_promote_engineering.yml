@@ -90,6 +90,19 @@ jobs:
           chcp 65001
           python config/scripts/sync_environment_workspaces.py
 
+      - name: Run Workspace Setup (TEST)
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_ACTIONS: true
+          PYTHONUTF8: 1
+          PYTHONIOENCODING: utf-8
+          SETUP_WORKSPACE_NAME: av01-test-processing
+        run: |
+          chcp 65001
+          python config/scripts/run_workspace_setup_in_fabric.py
+
       - name: Run Unit Tests
         id: run_tests
         if: ${{ !inputs.skip_tests }}
@@ -178,6 +191,19 @@ jobs:
         run: |
           chcp 65001
           python config/scripts/sync_environment_workspaces.py
+
+      - name: Run Workspace Setup (PROD)
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          GITHUB_ACTIONS: true
+          PYTHONUTF8: 1
+          PYTHONIOENCODING: utf-8
+          SETUP_WORKSPACE_NAME: av01-prod-processing
+        run: |
+          chcp 65001
+          python config/scripts/run_workspace_setup_in_fabric.py
 
       - name: Suspend PROD Engineering Capacity
         if: always()
