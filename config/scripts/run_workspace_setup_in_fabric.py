@@ -22,7 +22,7 @@ if str(config_dir) not in sys.path:
     sys.path.insert(0, str(config_dir))
 
 # Import from fabric_core modules (must be after sys.path modification)
-from fabric_core import auth, get_workspace_id, run_notebook, get_item_id
+from fabric_core import get_workspace_id, run_notebook, get_item_id
 # fmt: on
 
 
@@ -51,13 +51,7 @@ def main():
     print(f"Workspace: {workspace_name}")
     print(f"Notebook: {SETUP_NOTEBOOK_PATH}")
 
-    # Authenticate
-    print("\n--- Authenticating ---")
-    if not auth():
-        print("\n✗ Authentication failed")
-        sys.exit(1)
-
-    # Get workspace ID
+    # Get workspace ID (REST API handles authentication internally)
     print("\n--- Getting workspace ID ---")
     workspace_id = get_workspace_id(workspace_name)
     if not workspace_id:
