@@ -45,7 +45,7 @@ def _get_fabric_access_token():
         return None
 
 
-def _fabric_api_request(method, endpoint, json_body=None):
+def _fabric_api_request(method, endpoint, json_body=None, return_headers=False):
     """
     Make a request to the Fabric REST API.
 
@@ -53,13 +53,14 @@ def _fabric_api_request(method, endpoint, json_body=None):
         method: HTTP method ('GET', 'POST', etc.)
         endpoint: API endpoint (e.g., 'workspaces/{id}/items')
         json_body: Optional request body dict
+        return_headers: If True, include response headers in return
 
     Returns:
-        tuple: (success: bool, status_code: int, response_json: dict)
+        tuple: (success: bool, status_code: int, response_json: dict, headers: dict or None)
     """
     token = _get_fabric_access_token()
     if not token:
-        return False, 0, {'error': 'Failed to get access token'}
+        return False, 0, {'error': 'Failed to get access token'}, None
 
     url = f"{FABRIC_API_BASE}/{endpoint}"
     headers = {
@@ -78,10 +79,12 @@ def _fabric_api_request(method, endpoint, json_body=None):
         except json.JSONDecodeError:
             response_json = {'raw_response': response.text}
 
-        return True, response.status_code, response_json
+        if return_headers:
+            return True, response.status_code, response_json, dict(response.headers)
+        return True, response.status_code, response_json, None
 
     except requests.RequestException as e:
-        return False, 0, {'error': str(e)}
+        return False, 0, {'error': str(e)}, None
 
 
 def run_notebook(workspace_id, notebook_id, timeout_seconds=600, poll_interval=15):
@@ -100,7 +103,7 @@ def run_notebook(workspace_id, notebook_id, timeout_seconds=600, poll_interval=1
     # Trigger notebook execution
     endpoint = f"workspaces/{workspace_id}/items/{notebook_id}/jobs/instances?jobType=RunNotebook"
 
-    success, status_code, response = _fabric_api_request('POST', endpoint)
+    success, status_code, response, headers = _fabric_api_request('POST', endpoint, return_headers=True)
 
     if not success:
         return {
@@ -118,15 +121,22 @@ def run_notebook(workspace_id, notebook_id, timeout_seconds=600, poll_interval=1
             'error': f"API returned status {status_code}: {response}"
         }
 
-    # Extract job instance ID from response
+    # Extract job instance ID from response body or Location header
     job_id = response.get('id')
+
+    # For 202 Accepted, job ID may be in Location header
+    if not job_id and headers:
+        location = headers.get('Location', '')
+        # Location format: .../jobs/instances/{job_id}
+        if '/jobs/instances/' in location:
+            job_id = location.split('/jobs/instances/')[-1].split('?')[0]
 
     if not job_id:
         return {
             'success': False,
             'status': 'TriggerFailed',
             'job_id': None,
-            'error': f"No job ID returned in response: {response}"
+            'error': f"No job ID returned. Response: {response}, Headers: {headers}"
         }
 
     print(f"  Job triggered: {job_id}")
@@ -170,7 +180,7 @@ def get_job_status(workspace_id, item_id, job_id):
     """
     endpoint = f"workspaces/{workspace_id}/items/{item_id}/jobs/instances/{job_id}"
 
-    success, status_code, response = _fabric_api_request('GET', endpoint)
+    success, status_code, response, _ = _fabric_api_request('GET', endpoint)
 
     if not success:
         return {'status': 'Unknown', 'failure_reason': f"API call failed: {response.get('error')}"}
@@ -208,7 +218,7 @@ def get_item_id(workspace_name, item_name):
             break
 
     # List all items in workspace
-    success, status_code, response = _fabric_api_request('GET', f'workspaces/{workspace_id}/items')
+    success, status_code, response, _ = _fabric_api_request('GET', f'workspaces/{workspace_id}/items')
 
     if not success or status_code != 200:
         return None
@@ -231,7 +241,7 @@ def get_workspace_id(workspace_name):
     Returns:
         str: Workspace UUID or None if not found
     """
-    success, status_code, response = _fabric_api_request('GET', 'workspaces')
+    success, status_code, response, _ = _fabric_api_request('GET', 'workspaces')
 
     if not success or status_code != 200:
         return None
