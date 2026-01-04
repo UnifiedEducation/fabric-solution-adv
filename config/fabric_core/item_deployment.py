@@ -224,17 +224,26 @@ def create_item_with_definition(workspace_id, item_type, display_name, parts, ma
     Returns:
         str: Item ID if successful, None otherwise
     """
-    request_body = {
-        'displayName': display_name,
-        'type': item_type,
-        'definition': {
-            'parts': _encode_parts_for_api(parts)
+    # SQL Databases require dedicated endpoint and don't use definition parts
+    # (Git SQL files are for source control; schema populated by setup notebook)
+    if item_type == 'SQLDatabase':
+        endpoint = f'workspaces/{workspace_id}/sqlDatabases'
+        request_body = {
+            'displayName': display_name
         }
-    }
+    else:
+        endpoint = f'workspaces/{workspace_id}/items'
+        request_body = {
+            'displayName': display_name,
+            'type': item_type,
+            'definition': {
+                'parts': _encode_parts_for_api(parts)
+            }
+        }
 
     for attempt in range(max_retries):
         success, status_code, response = _fabric_api_request(
-            'POST', f'workspaces/{workspace_id}/items', request_body
+            'POST', endpoint, request_body
         )
 
         if not success:

@@ -163,6 +163,13 @@ else:
         print(f"Note: Environment publish returned: {e}")
         print("This is often expected if the environment is already published.")
 
+    # Wait for environment packages to become available
+    # Even after publish completes, there can be a delay before packages are usable in new sessions
+    PACKAGE_WAIT_SECONDS = 60
+    print(f"Waiting {PACKAGE_WAIT_SECONDS}s for environment packages to become available...")
+    time.sleep(PACKAGE_WAIT_SECONDS)
+    print("Environment ready.")
+
 # METADATA ********************
 
 # META {
