@@ -433,6 +433,19 @@ else:
     print(f"Warning: Update returned status {response.status_code}")
     print(response.text)
 
+# Set active value set using the dedicated Variable Library API
+# (activeValueSetName is a property of the item, not part of the definition)
+print(f"\nSetting active value set to: {environment}")
+patch_response = client.patch(
+    f"v1/workspaces/{workspace_id}/VariableLibraries/{vl_id}",
+    json={"properties": {"activeValueSetName": environment}}
+)
+if patch_response.status_code in [200, 202]:
+    print(f"Active value set updated to {environment}")
+else:
+    print(f"Warning: Failed to set active value set: {patch_response.status_code}")
+    print(patch_response.text)
+
 # METADATA ********************
 
 # META {
