@@ -15,9 +15,10 @@
 # # **Purpose**: Initialize a new workspace/environment with all required objects.
 # # **Usage**: Run once when creating a new workspace (e.g., for feature development).
 # # **Steps**:
-# 1. Create Lakehouse schemas and tables
-# 2. Publish environment (required after Git branch-out)
-# 3. Seed metadata SQL database
+# 1. Configure variable library with workspace-specific values (MUST run first!)
+# 2. Create Lakehouse schemas and tables
+# 3. Publish environment (required after Git branch-out)
+# 4. Seed metadata SQL database
 
 # MARKDOWN ********************
 
@@ -37,13 +38,33 @@ init_metadata_sql = True
 
 # MARKDOWN ********************
 
-# ## Step 1: Create Lakehouse Objects
-# # Note: %%configure removed - this notebook orchestrates child notebooks which have their own environment config.
-# Child notebooks handle their own environment attachment.
+# ## Step 1: Configure Variable Library
+# # MUST run first! This updates the variable library with workspace-specific item IDs
+# and sets the active value set to the current environment (TEST/PROD).
+# Other steps depend on reading correct values from the variable library.
 
 # CELL ********************
 
 import notebookutils
+
+print("Configuring variable library with workspace-specific values...")
+notebookutils.notebook.run("nb-av01-configure-variables")
+print("Variable library configuration complete.")
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# MARKDOWN ********************
+
+# ## Step 2: Create Lakehouse Objects
+# # Note: Variable library must be configured first (Step 1) so this step reads correct values.
+# Child notebooks handle their own environment attachment.
+
+# CELL ********************
 
 if init_lakehouses:
     print("Creating lakehouse schemas and tables...")
@@ -61,7 +82,7 @@ else:
 
 # MARKDOWN ********************
 
-# ## Step 2: Publish Environment
+# ## Step 3: Publish Environment
 # # When using Git branch-out or deployment, environments become unpublished in the new workspace.
 # This step re-publishes the environment using the Fabric REST API.
 
@@ -114,7 +135,7 @@ else:
 
 # MARKDOWN ********************
 
-# ## Step 3: Seed Metadata SQL Database
+# ## Step 4: Seed Metadata SQL Database
 
 # CELL ********************
 
@@ -124,26 +145,6 @@ if init_metadata_sql:
     print("Metadata seeding complete.")
 else:
     print("Skipping SQL seeding (init_metadata_sql=False)")
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# MARKDOWN ********************
-
-# ## Step 4: Configure Variable Library
-# # Auto-configure variable library with workspace-specific item IDs.
-# This updates the value set (DEV/TEST/PROD) with discovered notebook IDs,
-# SQL database connection info, and other environment-specific values.
-
-# CELL ********************
-
-print("Configuring variable library with workspace-specific values...")
-notebookutils.notebook.run("nb-av01-configure-variables")
-print("Variable library configuration complete.")
 
 # METADATA ********************
 

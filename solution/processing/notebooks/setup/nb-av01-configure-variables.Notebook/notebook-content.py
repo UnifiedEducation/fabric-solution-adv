@@ -265,6 +265,17 @@ decoded_parts[value_set_path] = value_set
 
 print(f"\nValue set now has {len(value_set['variableOverrides'])} overrides")
 
+# Also update the active value set to match current environment
+props_path = "variableLibraryProperties.json"
+if props_path in decoded_parts:
+    props = decoded_parts[props_path]
+    old_active = props.get("activeValueSetName", "")
+    props["activeValueSetName"] = environment
+    decoded_parts[props_path] = props
+    print(f"\nActive value set: {old_active} -> {environment}")
+else:
+    print(f"Warning: {props_path} not found in definition")
+
 # METADATA ********************
 
 # META {
