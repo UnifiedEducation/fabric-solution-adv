@@ -25,6 +25,7 @@
 
 import json
 import base64
+import time
 import notebookutils
 import sempy.fabric as fabric
 
@@ -190,12 +191,41 @@ vl_item = items_by_name[VL_NAME]
 vl_id = vl_item["id"]
 print(f"Found Variable Library: {VL_NAME} ({vl_id})")
 
-# Get current definition
+# Get current definition (may be async - 202 with Location header)
 response = client.post(f"v1/workspaces/{workspace_id}/items/{vl_id}/getDefinition")
+
+# Handle async operation (202 Accepted)
+if response.status_code == 202:
+    print("Definition request accepted, polling for completion...")
+    location = response.headers.get("Location")
+    retry_after = int(response.headers.get("Retry-After", 5))
+
+    # Poll for completion (max 60 seconds)
+    for attempt in range(12):
+        time.sleep(retry_after)
+        if location:
+            response = client.get(location)
+        else:
+            response = client.post(f"v1/workspaces/{workspace_id}/items/{vl_id}/getDefinition")
+
+        if response.status_code == 200:
+            break
+        elif response.status_code != 202:
+            raise ValueError(f"Failed to get definition: {response.status_code} - {response.text}")
+        print(f"  Still waiting... (attempt {attempt + 1})")
+
+if response.status_code != 200:
+    raise ValueError(f"Failed to get Variable Library definition: {response.status_code} - {response.text}")
+
 definition_response = response.json()
 
-# Extract parts from definition
-parts = definition_response.get("definition", {}).get("parts", [])
+# Extract parts from definition (handle None/empty explicitly)
+definition = definition_response.get("definition") or {}
+parts = definition.get("parts", [])
+
+if not parts:
+    print(f"Warning: No definition parts returned. Response: {definition_response}")
+    raise ValueError("Variable Library has no definition parts - cannot proceed")
 print(f"Variable Library has {len(parts)} definition parts")
 
 # Decode parts into a dict for easy manipulation
