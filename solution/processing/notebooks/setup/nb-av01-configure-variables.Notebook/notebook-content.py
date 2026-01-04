@@ -192,31 +192,35 @@ vl_id = vl_item["id"]
 print(f"Found Variable Library: {VL_NAME} ({vl_id})")
 
 # Helper function to handle Fabric's async getDefinition API
-def get_definition_with_retry(api_client, ws_id, item_id, max_retries=3):
+def get_definition_with_retry(api_client, ws_id, item_id, max_retries=5):
     """
     Get item definition, handling Fabric's async API pattern.
-    The getDefinition endpoint always returns 202, requiring polling.
-    Each retry starts a new async operation and polls until complete.
+    The getDefinition endpoint returns 202, requiring polling.
+    After operation completes, fetch result from the operation's result location.
     """
     for retry in range(max_retries):
         print(f"  Fetching definition (attempt {retry + 1}/{max_retries})...")
 
         # POST to start the getDefinition operation
         resp = api_client.post(f"v1/workspaces/{ws_id}/items/{item_id}/getDefinition")
+        print(f"    Initial response: {resp.status_code}")
 
-        # Handle 200 - definition returned directly (rare but possible)
+        # Handle 200 - definition returned directly
         if resp.status_code == 200:
             result = resp.json()
             if result and result.get("definition", {}).get("parts"):
+                print(f"    Got definition directly!")
                 return result
 
         # Handle 202 - async operation, need to poll
         if resp.status_code == 202:
             location = resp.headers.get("Location")
-            retry_after = int(resp.headers.get("Retry-After", 5))
+            retry_after = int(resp.headers.get("Retry-After", 2))
+            print(f"    Location: {location}")
+            print(f"    Retry-After: {retry_after}")
 
             # Poll for this operation to complete
-            for attempt in range(12):  # Max 60 seconds per retry
+            for attempt in range(20):  # Max 40 seconds per retry
                 time.sleep(retry_after)
 
                 if location:
@@ -226,26 +230,48 @@ def get_definition_with_retry(api_client, ws_id, item_id, max_retries=3):
                     poll_data = {}
 
                 status = poll_data.get("status", "")
+                percent = poll_data.get("percentComplete", 0)
 
                 if status == "Succeeded":
-                    print(f"    Operation completed (attempt {retry + 1})")
+                    print(f"    Operation succeeded! Keys in response: {list(poll_data.keys())}")
+
                     # Check if definition is in the poll response
                     if "definition" in poll_data and poll_data.get("definition", {}).get("parts"):
                         return poll_data
-                    # Otherwise, retry outer loop with new POST
+
+                    # Check for resultUri or result field
+                    result_uri = poll_data.get("resultUri") or poll_data.get("result")
+                    if result_uri:
+                        print(f"    Fetching result from: {result_uri}")
+                        result_resp = api_client.get(result_uri)
+                        if result_resp.status_code == 200:
+                            return result_resp.json()
+
+                    # Try fetching definition with GET (some APIs support this after operation completes)
+                    print(f"    Trying GET on definition endpoint...")
+                    get_resp = api_client.get(f"v1/workspaces/{ws_id}/items/{item_id}/getDefinition")
+                    if get_resp.status_code == 200:
+                        get_data = get_resp.json()
+                        if get_data and get_data.get("definition", {}).get("parts"):
+                            return get_data
+
+                    # Wait a bit and retry POST - maybe the result takes time to be available
+                    print(f"    Waiting before retry...")
+                    time.sleep(3)
                     break
+
                 elif status == "Failed":
                     error = poll_data.get("error", "Unknown error")
                     raise ValueError(f"Definition operation failed: {error}")
 
-                print(f"    Polling... status={status} (poll {attempt + 1}/12)")
+                print(f"    Polling... status={status}, percent={percent} (poll {attempt + 1}/20)")
             else:
                 raise ValueError("Timeout waiting for definition operation")
 
         elif resp.status_code != 200 and resp.status_code != 202:
             raise ValueError(f"Unexpected status code: {resp.status_code} - {resp.text}")
 
-    raise ValueError(f"Failed to get definition after {max_retries} retries - API keeps returning async operations")
+    raise ValueError(f"Failed to get definition after {max_retries} retries")
 
 # Get current definition (handles async API pattern with retries)
 definition_response = get_definition_with_retry(client, workspace_id, vl_id)
