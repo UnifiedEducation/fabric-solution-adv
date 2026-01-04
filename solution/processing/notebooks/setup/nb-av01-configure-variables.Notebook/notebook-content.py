@@ -375,7 +375,7 @@ decoded_parts[value_set_path] = value_set
 print(f"\nValue set now has {len(value_set['variableOverrides'])} overrides")
 
 # Also update the active value set to match current environment
-props_path = "variableLibraryProperties.json"
+props_path = "settings.json"
 if props_path in decoded_parts:
     props = decoded_parts[props_path]
     old_active = props.get("activeValueSetName", "")
