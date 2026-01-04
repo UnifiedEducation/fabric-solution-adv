@@ -191,55 +191,71 @@ vl_item = items_by_name[VL_NAME]
 vl_id = vl_item["id"]
 print(f"Found Variable Library: {VL_NAME} ({vl_id})")
 
-# Get current definition (may be async - 202 with Location header)
-response = client.post(f"v1/workspaces/{workspace_id}/items/{vl_id}/getDefinition")
+# Helper function to handle Fabric's async getDefinition API
+def get_definition_with_retry(api_client, ws_id, item_id, max_retries=3):
+    """
+    Get item definition, handling Fabric's async API pattern.
+    The getDefinition endpoint always returns 202, requiring polling.
+    Each retry starts a new async operation and polls until complete.
+    """
+    for retry in range(max_retries):
+        print(f"  Fetching definition (attempt {retry + 1}/{max_retries})...")
 
-# Handle async operation (202 Accepted)
-if response.status_code == 202:
-    print("Definition request accepted, polling for completion...")
-    location = response.headers.get("Location")
-    retry_after = int(response.headers.get("Retry-After", 5))
+        # POST to start the getDefinition operation
+        resp = api_client.post(f"v1/workspaces/{ws_id}/items/{item_id}/getDefinition")
 
-    # Poll for operation completion (max 60 seconds)
-    for attempt in range(12):
-        time.sleep(retry_after)
-        if location:
-            poll_response = client.get(location)
-        else:
-            poll_response = client.get(f"v1/workspaces/{workspace_id}/items/{vl_id}/getDefinition")
+        # Handle 200 - definition returned directly (rare but possible)
+        if resp.status_code == 200:
+            result = resp.json()
+            if result and result.get("definition", {}).get("parts"):
+                return result
 
-        poll_data = poll_response.json() if poll_response.status_code == 200 else {}
-        status = poll_data.get("status", "")
+        # Handle 202 - async operation, need to poll
+        if resp.status_code == 202:
+            location = resp.headers.get("Location")
+            retry_after = int(resp.headers.get("Retry-After", 5))
 
-        # Check if operation completed
-        if status == "Succeeded":
-            print(f"  Operation completed successfully")
-            # Now fetch the actual definition
-            response = client.post(f"v1/workspaces/{workspace_id}/items/{vl_id}/getDefinition")
-            break
-        elif status == "Failed":
-            raise ValueError(f"Definition operation failed: {poll_data}")
-        elif poll_response.status_code == 200 and "definition" in poll_data:
-            # Sometimes the definition is returned directly
-            response = poll_response
-            break
+            # Poll for this operation to complete
+            for attempt in range(12):  # Max 60 seconds per retry
+                time.sleep(retry_after)
 
-        print(f"  Still waiting... status={status} (attempt {attempt + 1})")
-    else:
-        raise ValueError("Timeout waiting for definition operation to complete")
+                if location:
+                    poll_resp = api_client.get(location)
+                    poll_data = poll_resp.json() if poll_resp.status_code == 200 else {}
+                else:
+                    poll_data = {}
 
-if response.status_code != 200:
-    raise ValueError(f"Failed to get Variable Library definition: {response.status_code} - {response.text}")
+                status = poll_data.get("status", "")
 
-definition_response = response.json()
+                if status == "Succeeded":
+                    print(f"    Operation completed (attempt {retry + 1})")
+                    # Check if definition is in the poll response
+                    if "definition" in poll_data and poll_data.get("definition", {}).get("parts"):
+                        return poll_data
+                    # Otherwise, retry outer loop with new POST
+                    break
+                elif status == "Failed":
+                    error = poll_data.get("error", "Unknown error")
+                    raise ValueError(f"Definition operation failed: {error}")
 
-# Extract parts from definition (handle None/empty explicitly)
+                print(f"    Polling... status={status} (poll {attempt + 1}/12)")
+            else:
+                raise ValueError("Timeout waiting for definition operation")
+
+        elif resp.status_code != 200 and resp.status_code != 202:
+            raise ValueError(f"Unexpected status code: {resp.status_code} - {resp.text}")
+
+    raise ValueError(f"Failed to get definition after {max_retries} retries - API keeps returning async operations")
+
+# Get current definition (handles async API pattern with retries)
+definition_response = get_definition_with_retry(client, workspace_id, vl_id)
+
+# Extract parts from definition
 definition = definition_response.get("definition") or {}
 parts = definition.get("parts", [])
 
 if not parts:
-    print(f"Warning: No definition parts returned. Response keys: {list(definition_response.keys())}")
-    print(f"Full response: {definition_response}")
+    print(f"Warning: No definition parts. Response keys: {list(definition_response.keys())}")
     raise ValueError("Variable Library has no definition parts - cannot proceed")
 print(f"Variable Library has {len(parts)} definition parts")
 
