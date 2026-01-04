@@ -200,19 +200,33 @@ if response.status_code == 202:
     location = response.headers.get("Location")
     retry_after = int(response.headers.get("Retry-After", 5))
 
-    # Poll for completion (max 60 seconds)
+    # Poll for operation completion (max 60 seconds)
     for attempt in range(12):
         time.sleep(retry_after)
         if location:
-            response = client.get(location)
+            poll_response = client.get(location)
         else:
-            response = client.post(f"v1/workspaces/{workspace_id}/items/{vl_id}/getDefinition")
+            poll_response = client.get(f"v1/workspaces/{workspace_id}/items/{vl_id}/getDefinition")
 
-        if response.status_code == 200:
+        poll_data = poll_response.json() if poll_response.status_code == 200 else {}
+        status = poll_data.get("status", "")
+
+        # Check if operation completed
+        if status == "Succeeded":
+            print(f"  Operation completed successfully")
+            # Now fetch the actual definition
+            response = client.post(f"v1/workspaces/{workspace_id}/items/{vl_id}/getDefinition")
             break
-        elif response.status_code != 202:
-            raise ValueError(f"Failed to get definition: {response.status_code} - {response.text}")
-        print(f"  Still waiting... (attempt {attempt + 1})")
+        elif status == "Failed":
+            raise ValueError(f"Definition operation failed: {poll_data}")
+        elif poll_response.status_code == 200 and "definition" in poll_data:
+            # Sometimes the definition is returned directly
+            response = poll_response
+            break
+
+        print(f"  Still waiting... status={status} (attempt {attempt + 1})")
+    else:
+        raise ValueError("Timeout waiting for definition operation to complete")
 
 if response.status_code != 200:
     raise ValueError(f"Failed to get Variable Library definition: {response.status_code} - {response.text}")
@@ -224,7 +238,8 @@ definition = definition_response.get("definition") or {}
 parts = definition.get("parts", [])
 
 if not parts:
-    print(f"Warning: No definition parts returned. Response: {definition_response}")
+    print(f"Warning: No definition parts returned. Response keys: {list(definition_response.keys())}")
+    print(f"Full response: {definition_response}")
     raise ValueError("Variable Library has no definition parts - cannot proceed")
 print(f"Variable Library has {len(parts)} definition parts")
 
