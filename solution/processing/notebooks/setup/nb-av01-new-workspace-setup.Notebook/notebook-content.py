@@ -89,6 +89,7 @@ else:
 # CELL ********************
 
 import sempy.fabric as fabric
+import time
 
 # Initialize Fabric REST API client
 client = fabric.FabricRestClient()
@@ -120,7 +121,43 @@ else:
     # Publish environment with error handling
     try:
         response = client.post(path_or_url=endpoint)
-        print(f"Environment published successfully (status: {response.status_code})")
+        print(f"Environment publish initiated (status: {response.status_code})")
+
+        # If 202 Accepted, poll for completion (async operation)
+        if response.status_code == 202:
+            location = response.headers.get("Location")
+            retry_after = int(response.headers.get("Retry-After", 10))
+            print(f"Polling for environment publish completion...")
+
+            max_wait = 600  # 10 minutes max (environment publish can be slow)
+            elapsed = 0
+            while elapsed < max_wait:
+                time.sleep(retry_after)
+                elapsed += retry_after
+
+                if location:
+                    poll_resp = client.get(location)
+                    if poll_resp.status_code == 200:
+                        poll_data = poll_resp.json()
+                        status = poll_data.get("status", "")
+                        percent = poll_data.get("percentComplete", 0)
+
+                        if status == "Succeeded":
+                            print(f"Environment published successfully!")
+                            break
+                        elif status == "Failed":
+                            error = poll_data.get("error", {}).get("message", "Unknown error")
+                            print(f"Warning: Environment publish failed: {error}")
+                            break
+                        else:
+                            print(f"  Publishing... status={status}, {percent}% complete ({elapsed}s)")
+                else:
+                    # No location header, assume it's done
+                    break
+            else:
+                print(f"Warning: Timeout waiting for environment publish after {max_wait}s")
+        elif response.status_code == 200:
+            print("Environment published successfully!")
     except Exception as e:
         # This may fail if environment is already published or doesn't need publishing
         print(f"Note: Environment publish returned: {e}")
