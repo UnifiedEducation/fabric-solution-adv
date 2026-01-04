@@ -15,9 +15,10 @@
 # # **Purpose**: Initialize a new workspace/environment with all required objects.
 # # **Usage**: Run once when creating a new workspace (e.g., for feature development).
 # # **Steps**:
-# 1. Create Lakehouse schemas and tables
-# 2. Publish environment (required after Git branch-out)
-# 3. Seed metadata SQL database
+# 1. Configure variable library with workspace-specific values (MUST run first!)
+# 2. Create Lakehouse schemas and tables
+# 3. Publish environment (required after Git branch-out)
+# 4. Seed metadata SQL database
 
 # MARKDOWN ********************
 
@@ -37,19 +38,18 @@ init_metadata_sql = True
 
 # MARKDOWN ********************
 
-# ## Runtime Environment Configuration
-
+# ## Step 1: Configure Variable Library
+# # MUST run first! This updates the variable library with workspace-specific item IDs
+# and sets the active value set to the current environment (TEST/PROD).
+# Other steps depend on reading correct values from the variable library.
 
 # CELL ********************
 
-# MAGIC %%configure -f
-# MAGIC {
-# MAGIC     "environment": {
-# MAGIC         "id": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_ID)"},
-# MAGIC         "name": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_NAME)"}
-# MAGIC     }
-# MAGIC }
+import notebookutils
 
+print("Configuring variable library with workspace-specific values...")
+notebookutils.notebook.run("nb-av01-configure-variables")
+print("Variable library configuration complete.")
 
 # METADATA ********************
 
@@ -60,11 +60,11 @@ init_metadata_sql = True
 
 # MARKDOWN ********************
 
-# ## Step 1: Create Lakehouse Objects
+# ## Step 2: Create Lakehouse Objects
+# # Note: Variable library must be configured first (Step 1) so this step reads correct values.
+# Child notebooks handle their own environment attachment.
 
 # CELL ********************
-
-import notebookutils
 
 if init_lakehouses:
     print("Creating lakehouse schemas and tables...")
@@ -82,35 +82,93 @@ else:
 
 # MARKDOWN ********************
 
-# ## Step 2: Publish Environment
+# ## Step 3: Publish Environment
 # # When using Git branch-out or deployment, environments become unpublished in the new workspace.
 # This step re-publishes the environment using the Fabric REST API.
 
 # CELL ********************
 
 import sempy.fabric as fabric
+import time
 
 # Initialize Fabric REST API client
 client = fabric.FabricRestClient()
 
-# Get workspace and environment IDs from Variable Library
-variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
-workspace_id = variables.PROCESSING_WORKSPACE_ID
-environment_id = variables.ENVIRONMENT_ID
+# Get workspace ID from runtime context (works for fresh deployments)
+workspace_id = notebookutils.runtime.context["currentWorkspaceId"]
+print(f"Workspace ID: {workspace_id}")
 
-# Build endpoint URL (preview API requires beta flag)
-# Ref: https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
-FABRIC_API_BETA = True
-endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}/staging/publish?beta={FABRIC_API_BETA}"
+# Find environment ID by querying workspace items
+ENV_NAME = "env-av01-dataeng"
+response = client.get(f"v1/workspaces/{workspace_id}/items")
+items = response.json().get("value", [])
+environment_id = None
+for item in items:
+    if item.get("displayName") == ENV_NAME and item.get("type") == "Environment":
+        environment_id = item.get("id")
+        break
 
-# Publish environment with error handling
-try:
-    response = client.post(path_or_url=endpoint)
-    print(f"Environment published successfully (status: {response.status_code})")
-except Exception as e:
-    # This may fail if environment is already published or doesn't need publishing
-    print(f"Note: Environment publish returned: {e}")
-    print("This is often expected if the environment is already published.")
+if not environment_id:
+    print(f"Warning: Environment '{ENV_NAME}' not found in workspace. Skipping publish.")
+else:
+    print(f"Environment ID: {environment_id}")
+
+    # Build endpoint URL (preview API requires beta flag)
+    # Ref: https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
+    FABRIC_API_BETA = True
+    endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}/staging/publish?beta={FABRIC_API_BETA}"
+
+    # Publish environment with error handling
+    try:
+        response = client.post(path_or_url=endpoint)
+        print(f"Environment publish initiated (status: {response.status_code})")
+
+        # If 202 Accepted, poll for completion (async operation)
+        if response.status_code == 202:
+            location = response.headers.get("Location")
+            retry_after = int(response.headers.get("Retry-After", 10))
+            print(f"Polling for environment publish completion...")
+
+            max_wait = 600  # 10 minutes max (environment publish can be slow)
+            elapsed = 0
+            while elapsed < max_wait:
+                time.sleep(retry_after)
+                elapsed += retry_after
+
+                if location:
+                    poll_resp = client.get(location)
+                    if poll_resp.status_code == 200:
+                        poll_data = poll_resp.json()
+                        status = poll_data.get("status", "")
+                        percent = poll_data.get("percentComplete", 0)
+
+                        if status == "Succeeded":
+                            print(f"Environment published successfully!")
+                            break
+                        elif status == "Failed":
+                            error = poll_data.get("error", {}).get("message", "Unknown error")
+                            print(f"Warning: Environment publish failed: {error}")
+                            break
+                        else:
+                            print(f"  Publishing... status={status}, {percent}% complete ({elapsed}s)")
+                else:
+                    # No location header, assume it's done
+                    break
+            else:
+                print(f"Warning: Timeout waiting for environment publish after {max_wait}s")
+        elif response.status_code == 200:
+            print("Environment published successfully!")
+    except Exception as e:
+        # This may fail if environment is already published or doesn't need publishing
+        print(f"Note: Environment publish returned: {e}")
+        print("This is often expected if the environment is already published.")
+
+    # Wait for environment packages to become available
+    # Even after publish completes, there can be a delay before packages are usable in new sessions
+    PACKAGE_WAIT_SECONDS = 60
+    print(f"Waiting {PACKAGE_WAIT_SECONDS}s for environment packages to become available...")
+    time.sleep(PACKAGE_WAIT_SECONDS)
+    print("Environment ready.")
 
 # METADATA ********************
 
@@ -121,7 +179,7 @@ except Exception as e:
 
 # MARKDOWN ********************
 
-# ## Step 3: Seed Metadata SQL Database
+# ## Step 4: Seed Metadata SQL Database
 
 # CELL ********************
 

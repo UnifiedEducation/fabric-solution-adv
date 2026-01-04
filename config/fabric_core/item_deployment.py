@@ -87,6 +87,9 @@ def _fabric_api_request(method, endpoint, json_body=None):
         # Parse response body if present
         try:
             response_json = response.json() if response.text else {}
+            # Handle case where response.json() returns None (valid JSON null)
+            if response_json is None:
+                response_json = {}
         except json.JSONDecodeError:
             response_json = {'raw_response': response.text}
 
@@ -207,7 +210,7 @@ def _encode_parts_for_api(parts):
     ]
 
 
-def create_item_with_definition(workspace_id, item_type, display_name, parts):
+def create_item_with_definition(workspace_id, item_type, display_name, parts, max_retries=3):
     """
     Create a new item with definition.
 
@@ -216,39 +219,69 @@ def create_item_with_definition(workspace_id, item_type, display_name, parts):
         item_type: Item type (e.g., 'Notebook', 'Lakehouse')
         display_name: Display name for the item
         parts: List of {path, content} dicts
+        max_retries: Maximum retry attempts for transient errors
 
     Returns:
         str: Item ID if successful, None otherwise
     """
-    request_body = {
-        'displayName': display_name,
-        'type': item_type,
-        'definition': {
-            'parts': _encode_parts_for_api(parts)
+    # SQL Databases require dedicated endpoint and don't use definition parts
+    # (Git SQL files are for source control; schema populated by setup notebook)
+    if item_type == 'SQLDatabase':
+        endpoint = f'workspaces/{workspace_id}/sqlDatabases'
+        request_body = {
+            'displayName': display_name
         }
-    }
-
-    success, status_code, response = _fabric_api_request(
-        'POST', f'workspaces/{workspace_id}/items', request_body
-    )
-
-    if not success:
-        print(f"  Failed to create item: {response.get('error', 'Unknown error')}")
-        return None
-
-    # 201 = created, 202 = accepted (long-running operation)
-    if status_code in [201, 202]:
-        item_id = response.get('id')
-
-        if status_code == 202:
-            # Long-running operation - wait for completion
-            print(f"  Item creation in progress...")
-            time.sleep(5)  # Brief wait for async creation
-
-        return item_id
     else:
+        endpoint = f'workspaces/{workspace_id}/items'
+        request_body = {
+            'displayName': display_name,
+            'type': item_type,
+            'definition': {
+                'parts': _encode_parts_for_api(parts)
+            }
+        }
+
+    for attempt in range(max_retries):
+        success, status_code, response = _fabric_api_request(
+            'POST', endpoint, request_body
+        )
+
+        if not success:
+            print(f"  Failed to create item: {response.get('error', 'Unknown error')}")
+            return None
+
+        # 201 = created, 202 = accepted (long-running operation)
+        if status_code in [201, 202]:
+            item_id = response.get('id') if response else None
+
+            if status_code == 202:
+                # Long-running operation - wait for completion
+                print(f"  Item creation in progress (202 Accepted)...")
+                time.sleep(5)  # Brief wait for async creation
+
+            if item_id:
+                return item_id
+            else:
+                # 202 with no id means we need to treat it as success
+                # (the item will be created asynchronously)
+                if status_code == 202:
+                    print(f"  Async creation accepted, no immediate ID returned")
+                    return "pending"  # Return non-None to indicate success
+                print(f"  Warning: 201 response but no item ID in response: {response}")
+                return None
+
+        # Check for retryable errors (capacity not active, throttling)
+        error_code = response.get('errorCode', '') if response else ''
+        if error_code in ['CapacityNotActive', 'TooManyRequests'] and attempt < max_retries - 1:
+            wait_time = 10 * (attempt + 1)  # Exponential backoff: 10s, 20s, 30s
+            print(f"  Retrying in {wait_time}s due to {error_code}...")
+            time.sleep(wait_time)
+            continue
+
         print(f"  API returned status {status_code}: {response}")
         return None
+
+    return None
 
 
 def update_item_definition(workspace_id, item_id, parts):
@@ -277,13 +310,14 @@ def update_item_definition(workspace_id, item_id, parts):
     )
 
     if not success:
-        print(f"  Failed to update item definition: {response.get('error', 'Unknown error')}")
+        error_msg = response.get('error', 'Unknown error') if response else 'Unknown error'
+        print(f"  Failed to update item definition: {error_msg}")
         return False
 
     # 200 = success, 202 = accepted (long-running operation)
     if status_code in [200, 202]:
         if status_code == 202:
-            print(f"  Update in progress...")
+            print(f"  Update in progress (202 Accepted)...")
             time.sleep(2)
         return True
     else:
