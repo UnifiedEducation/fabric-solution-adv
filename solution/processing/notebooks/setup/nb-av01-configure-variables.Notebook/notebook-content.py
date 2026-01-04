@@ -196,12 +196,27 @@ def get_definition_with_retry(api_client, ws_id, item_id, max_retries=5):
     """
     Get item definition, handling Fabric's async API pattern.
     The getDefinition endpoint returns 202, requiring polling.
-    After operation completes, fetch result from the operation's result location.
+    After operation completes, fetch result from {location}/result.
     """
     for retry in range(max_retries):
         print(f"  Fetching definition (attempt {retry + 1}/{max_retries})...")
 
-        # POST to start the getDefinition operation
+        # Try using sempy's built-in LRO handling first
+        try:
+            resp = api_client.post(
+                f"v1/workspaces/{ws_id}/items/{item_id}/getDefinition",
+                lro_wait=True
+            )
+            print(f"    Response with lro_wait: {resp.status_code}")
+            if resp.status_code == 200:
+                result = resp.json()
+                if result and result.get("definition", {}).get("parts"):
+                    print(f"    Got definition via lro_wait!")
+                    return result
+        except Exception as e:
+            print(f"    lro_wait approach failed: {e}")
+
+        # Manual approach: POST to start the getDefinition operation
         resp = api_client.post(f"v1/workspaces/{ws_id}/items/{item_id}/getDefinition")
         print(f"    Initial response: {resp.status_code}")
 
@@ -233,31 +248,38 @@ def get_definition_with_retry(api_client, ws_id, item_id, max_retries=5):
                 percent = poll_data.get("percentComplete", 0)
 
                 if status == "Succeeded":
-                    print(f"    Operation succeeded! Keys in response: {list(poll_data.keys())}")
+                    print(f"    Operation succeeded! Keys: {list(poll_data.keys())}")
 
                     # Check if definition is in the poll response
                     if "definition" in poll_data and poll_data.get("definition", {}).get("parts"):
                         return poll_data
 
+                    # Try fetching from {location}/result
+                    try:
+                        print(f"    Trying {location}/result...")
+                        result_resp = api_client.get(f"{location}/result")
+                        if result_resp.status_code == 200:
+                            result_data = result_resp.json()
+                            if result_data and result_data.get("definition", {}).get("parts"):
+                                return result_data
+                            print(f"    /result keys: {list(result_data.keys()) if result_data else 'None'}")
+                    except Exception as e:
+                        print(f"    /result failed: {e}")
+
                     # Check for resultUri or result field
                     result_uri = poll_data.get("resultUri") or poll_data.get("result")
                     if result_uri:
-                        print(f"    Fetching result from: {result_uri}")
-                        result_resp = api_client.get(result_uri)
-                        if result_resp.status_code == 200:
-                            return result_resp.json()
+                        print(f"    Fetching from resultUri: {result_uri}")
+                        try:
+                            result_resp = api_client.get(result_uri)
+                            if result_resp.status_code == 200:
+                                return result_resp.json()
+                        except Exception as e:
+                            print(f"    resultUri failed: {e}")
 
-                    # Try fetching definition with GET (some APIs support this after operation completes)
-                    print(f"    Trying GET on definition endpoint...")
-                    get_resp = api_client.get(f"v1/workspaces/{ws_id}/items/{item_id}/getDefinition")
-                    if get_resp.status_code == 200:
-                        get_data = get_resp.json()
-                        if get_data and get_data.get("definition", {}).get("parts"):
-                            return get_data
-
-                    # Wait a bit and retry POST - maybe the result takes time to be available
+                    # Wait and retry POST
                     print(f"    Waiting before retry...")
-                    time.sleep(3)
+                    time.sleep(5)
                     break
 
                 elif status == "Failed":
