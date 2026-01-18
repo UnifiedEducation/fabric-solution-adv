@@ -69,7 +69,7 @@ def main():
 
     print("=== AUTHENTICATING ===")
     if not auth():
-        print("\n✗ Authentication failed. Cannot proceed with workspace creation.")
+        print("\nERROR: Authentication failed. Cannot proceed with workspace creation.")
         return
 
     print(
@@ -85,7 +85,7 @@ def main():
             workspace_type, solution_version)
 
         if not capacity_name:
-            print(f"✗ Unknown workspace type: {workspace_type}")
+            print(f"ERROR: Unknown workspace type: {workspace_type}")
             continue
 
         print(f"\n--- Creating {workspace_name} ---")
@@ -124,12 +124,12 @@ def main():
                         f'workspaces/{workspace_id}/git/initializeConnection',
                         '-i', '{}'
                     ])
-                    print(f"  ✓ Initialized Git connection")
+                    print(f"   Initialized Git connection")
 
                     # Pull content from Git into the workspace
                     update_workspace_from_git(workspace_id, workspace_name)
 
-    print("\n✓ Feature workspace creation complete")
+    print("\n Feature workspace creation complete")
 
 
 if __name__ == "__main__":

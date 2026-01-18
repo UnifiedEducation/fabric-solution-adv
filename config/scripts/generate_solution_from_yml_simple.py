@@ -35,7 +35,7 @@ def main():
 
     print("=== AUTHENTICATING ===")
     if not auth():
-        print("\n✗ Authentication failed. Cannot proceed.")
+        print("\nERROR: Authentication failed. Cannot proceed.")
         return
 
     azure_config = config['azure']
@@ -79,7 +79,7 @@ def main():
         suspend_capacity(capacity_config['name'],
                          subscription_id, resource_group)
 
-    print("\n✓ Done")
+    print("\n Done")
 
 
 if __name__ == "__main__":

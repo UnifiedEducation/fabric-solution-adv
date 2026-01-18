@@ -15,10 +15,10 @@ def auth():
                          '-p', os.getenv('SPN_CLIENT_SECRET'), '--tenant', os.getenv('AZURE_TENANT_ID')])
 
     if result.returncode != 0:
-        print(f"✗ Authentication failed")
+        print("Authentication failed")
         print(f"  stdout: {result.stdout}")
         print(f"  stderr: {result.stderr}")
         return False
 
-    print(f"✓ Authenticated successfully")
+    print("Authenticated successfully")
     return True

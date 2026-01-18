@@ -27,7 +27,7 @@ def create_capacity(capacity_config, subscription_id, resource_group, defaults):
     capacity_name = capacity_config['name']
 
     if capacity_exists(capacity_name, subscription_id, resource_group):
-        print(f"✓ {capacity_name} exists")
+        print(f"  {capacity_name} exists")
         call_azure_api(
             f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Fabric/capacities/{capacity_name}/resume?api-version=2023-11-01", 'post')
         return
@@ -47,7 +47,7 @@ def create_capacity(capacity_config, subscription_id, resource_group, defaults):
         f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Fabric/capacities/{capacity_name}?api-version=2023-11-01", 'put', request_body)
 
     if status in [200, 201]:
-        print(f"✓ Created {capacity_name}")
+        print(f"  Created {capacity_name}")
         time.sleep(40)
 
 
@@ -67,8 +67,8 @@ def suspend_capacity(capacity_name, subscription_id, resource_group):
         status, _ = call_azure_api(
             f"subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.Fabric/capacities/{capacity_name}/suspend?api-version=2023-11-01", 'post')
         if status in [200, 202]:
-            print(f"✓ Suspended {capacity_name}")
+            print(f"  Suspended {capacity_name}")
             return True
         time.sleep(60)
-    print(f"✗ Failed to suspend {capacity_name}")
+    print(f"  ERROR: Failed to suspend {capacity_name}")
     return False
