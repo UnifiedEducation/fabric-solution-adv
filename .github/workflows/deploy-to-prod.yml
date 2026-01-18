@@ -1,0 +1,100 @@
+name: Deploy to PROD Environment
+
+# Manual trigger for PROD deployment using fabric-cicd.
+# Includes approval gate via GitHub Environments.
+# Resumes capacities before deployment and suspends after (cost optimization).
+on:
+  workflow_dispatch:
+    inputs:
+      skip_approval:
+        description: 'Skip manual approval (emergency only)'
+        type: boolean
+        default: false
+      run_workspace_setup:
+        description: 'Run workspace setup notebook (first deployment only)'
+        type: boolean
+        default: false
+      skip_orphan_cleanup:
+        description: 'Skip orphan item cleanup (safer for PROD)'
+        type: boolean
+        default: true
+      skip_capacity_suspend:
+        description: 'Skip capacity suspend (leave running)'
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  approval:
+    name: Approval Gate
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_approval }}
+    environment: production
+    steps:
+      - run: echo "Approved by ${{ github.actor }}"
+
+  deploy-to-prod:
+    name: Deploy to PROD
+    needs: [approval]
+    if: ${{ always() && (needs.approval.result == 'success' || inputs.skip_approval) }}
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r config/requirements.txt
+
+      - name: Resume PROD capacities
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/manage_capacity.py `
+            --environment PROD --action resume --wait
+
+      - name: Deploy all workspaces to PROD
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          PROD_DATASTORES_WORKSPACE_ID: ${{ vars.PROD_DATASTORES_WORKSPACE_ID }}
+          PROD_PROCESSING_WORKSPACE_ID: ${{ vars.PROD_PROCESSING_WORKSPACE_ID }}
+          PROD_CONSUMPTION_WORKSPACE_ID: ${{ vars.PROD_CONSUMPTION_WORKSPACE_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          $cleanup = if ("${{ inputs.skip_orphan_cleanup }}" -eq "true") { "--no-cleanup" } else { "" }
+          python config/scripts/deploy_with_fabric_cicd.py `
+            --environment PROD --all-workspaces $cleanup
+
+      - name: Run workspace setup
+        if: ${{ inputs.run_workspace_setup }}
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          PROD_PROCESSING_WORKSPACE_ID: ${{ vars.PROD_PROCESSING_WORKSPACE_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/run_workspace_setup.py --environment PROD
+
+      - name: Suspend PROD capacities
+        if: ${{ always() && !inputs.skip_capacity_suspend }}
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/manage_capacity.py `
+            --environment PROD --action suspend

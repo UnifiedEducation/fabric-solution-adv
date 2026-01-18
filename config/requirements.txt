@@ -1,3 +1,4 @@
 ms-fabric-cli==1.2.0
 PyYAML==6.0.2
 python-dotenv>=1.0.0
+fabric-cicd>=0.1.0

@@ -1,0 +1,95 @@
+name: Deploy to TEST Environment
+
+# Manual trigger for TEST deployment using fabric-cicd.
+# Resumes capacities before deployment and suspends after (cost optimization).
+on:
+  workflow_dispatch:
+    inputs:
+      run_unit_tests:
+        description: 'Run unit tests after deployment'
+        type: boolean
+        default: true
+      run_workspace_setup:
+        description: 'Run workspace setup notebook (first deployment only)'
+        type: boolean
+        default: false
+      skip_capacity_suspend:
+        description: 'Skip capacity suspend (leave running for debugging)'
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  deploy-to-test:
+    name: Deploy to TEST
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r config/requirements.txt
+
+      - name: Resume TEST capacities
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/manage_capacity.py `
+            --environment TEST --action resume --wait
+
+      - name: Deploy all workspaces to TEST
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TEST_DATASTORES_WORKSPACE_ID: ${{ vars.TEST_DATASTORES_WORKSPACE_ID }}
+          TEST_PROCESSING_WORKSPACE_ID: ${{ vars.TEST_PROCESSING_WORKSPACE_ID }}
+          TEST_CONSUMPTION_WORKSPACE_ID: ${{ vars.TEST_CONSUMPTION_WORKSPACE_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/deploy_with_fabric_cicd.py `
+            --environment TEST --all-workspaces
+
+      - name: Run workspace setup
+        if: ${{ inputs.run_workspace_setup }}
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TEST_PROCESSING_WORKSPACE_ID: ${{ vars.TEST_PROCESSING_WORKSPACE_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/run_workspace_setup.py --environment TEST
+
+      - name: Run unit tests
+        if: ${{ inputs.run_unit_tests }}
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TEST_PROCESSING_WORKSPACE_ID: ${{ vars.TEST_PROCESSING_WORKSPACE_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/run_unit_tests.py --environment TEST
+
+      - name: Suspend TEST capacities
+        if: ${{ always() && !inputs.skip_capacity_suspend }}
+        env:
+          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          GITHUB_ACTIONS: true
+        run: |
+          python config/scripts/manage_capacity.py `
+            --environment TEST --action suspend
