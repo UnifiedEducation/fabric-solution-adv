@@ -37,7 +37,7 @@ def create_workspace(workspace_config):
     workspace_name = workspace_config['name']
 
     if workspace_exists(workspace_name):
-        print(f"✓ {workspace_name} exists")
+        print(f" {workspace_name} exists")
         return get_workspace_id(workspace_name)
 
     # Create workspace and check if successful
@@ -45,19 +45,19 @@ def create_workspace(workspace_config):
                          f'{workspace_name}.Workspace', '-P', f'capacityname={workspace_config["capacity"]}'])
 
     if result.returncode != 0:
-        print(f"✗ Failed to create {workspace_name}")
+        print(f"ERROR: Failed to create {workspace_name}")
         print(f"  stdout: {result.stdout}")
         print(f"  stderr: {result.stderr}")
         return None
 
-    print(f"✓ Created {workspace_name}")
+    print(f" Created {workspace_name}")
 
     # Wait for workspace to be provisioned
     time.sleep(5)
     workspace_id = get_workspace_id(workspace_name)
 
     if not workspace_id:
-        print(f"  ⚠ Warning: Workspace created but ID could not be retrieved")
+        print(f"  Warning: Warning: Workspace created but ID could not be retrieved")
 
     return workspace_id
 
@@ -115,10 +115,10 @@ def assign_permissions(workspace_id, permissions, security_groups):
         if group_id in existing_assignments:
             existing_role = existing_assignments[group_id]
             if existing_role == desired_role:
-                print(f"  ✓ {permission['group']} already has {desired_role} role")
+                print(f"   {permission['group']} already has {desired_role} role")
                 continue
             else:
-                print(f"  ⚠ {permission['group']} already has {existing_role} role (wanted {desired_role})")
+                print(f"  Warning: {permission['group']} already has {existing_role} role (wanted {desired_role})")
                 continue
 
         request_body = {
@@ -135,22 +135,22 @@ def assign_permissions(workspace_id, permissions, security_groups):
 
         # Handle empty or invalid JSON response
         if not assign_response.stdout.strip():
-            print(f"  ✗ Failed to assign {permission['role']} to {permission['group']}: Empty response")
+            print(f"  ERROR: Failed to assign {permission['role']} to {permission['group']}: Empty response")
             print(f"    stderr: {assign_response.stderr}")
             continue
 
         try:
             response_json = json.loads(assign_response.stdout)
         except json.JSONDecodeError as e:
-            print(f"  ✗ Failed to assign {permission['role']} to {permission['group']}: Invalid JSON")
+            print(f"  ERROR: Failed to assign {permission['role']} to {permission['group']}: Invalid JSON")
             print(f"    stdout: {assign_response.stdout}")
             print(f"    stderr: {assign_response.stderr}")
             continue
 
         if response_json.get('status_code') in [200, 201]:
             print(
-                f"  ✓ Assigned {permission['role']} to {permission['group']}")
+                f"   Assigned {permission['role']} to {permission['group']}")
         else:
-            print(f"  ✗ Failed to assign {permission['role']} to {permission['group']}")
+            print(f"  ERROR: Failed to assign {permission['role']} to {permission['group']}")
             print(f"    Status: {response_json.get('status_code')}")
             print(f"    Response: {response_json.get('text', {})}")

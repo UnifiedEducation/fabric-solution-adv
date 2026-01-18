@@ -49,12 +49,12 @@ def main():
     ]
 
     if not dev_workspaces:
-        print("⚠ No dev workspaces configured with Git integration found")
+        print("Warning: No dev workspaces configured with Git integration found")
         return
 
     print("=== AUTHENTICATING ===")
     if not auth():
-        print("\n✗ Authentication failed. Cannot proceed with workspace sync.")
+        print("\nERROR: Authentication failed. Cannot proceed with workspace sync.")
         return
 
     print(f"\n=== SYNCING DEV WORKSPACES FROM MAIN ===")
@@ -71,16 +71,16 @@ def main():
         workspace_id = get_workspace_id(workspace_name)
 
         if not workspace_id:
-            print(f"  ⚠ Workspace not found: {workspace_name}")
+            print(f"  Warning: Workspace not found: {workspace_name}")
             continue
 
         # Update workspace from Git (pull latest from main branch)
         success = update_workspace_from_git(workspace_id, workspace_name)
 
         if not success:
-            print(f"  ⚠ Failed to update {workspace_name} from Git")
+            print(f"  Warning: Failed to update {workspace_name} from Git")
 
-    print("\n✓ Dev workspace sync complete")
+    print("\n Dev workspace sync complete")
 
 
 if __name__ == "__main__":
