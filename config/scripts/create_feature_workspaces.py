@@ -25,11 +25,6 @@ import json
 # fmt: on
 
 
-# Ensure UTF-8 encoding for stdout
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8')
-
-
 def get_capacity_for_workspace_type(workspace_type, solution_version):
     """Determine which capacity to use based on workspace type."""
     capacity_map = {

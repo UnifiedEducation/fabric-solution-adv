@@ -17,10 +17,14 @@
 # MARKDOWN ********************
 
 # # nb-av01-2-clean
-# # **Purpose**: Transform Bronze data to Silver using metadata-driven cleansing rules.
-# # **Stage**: Bronze → Silver
-# # **Dependencies**: nb-av01-generic-functions
-# # **Metadata**: instructions.transformations (dest_layer='silver'), metadata.transform_store
+# 
+# **Purpose**: Transform Bronze data to Silver using metadata-driven cleansing rules.
+# 
+# **Stage**: Bronze → Silver
+# 
+# **Dependencies**: nb-av01-generic-functions
+# 
+# **Metadata**: instructions.transformations (dest_layer='silver'), metadata.transform_store
 
 # MARKDOWN ********************
 

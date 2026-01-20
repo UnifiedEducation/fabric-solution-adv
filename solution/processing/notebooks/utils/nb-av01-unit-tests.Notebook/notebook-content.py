@@ -34,17 +34,22 @@
 
 # MARKDOWN ********************
 
-# # nb-av01-unit-tests
-# # **Purpose**: Unit tests for core functions in nb-av01-generic-functions.
-# # **Usage**: Run manually to validate function behavior after changes.
-# # **Dependencies**: nb-av01-generic-functions
-# # **Test Coverage**:
+# ![image-alt-text](image-URL)# nb-av01-unit-tests
+# 
+# **Purpose**: Unit tests for core functions in nb-av01-generic-functions.
+# 
+# **Usage**: Run manually to validate function behavior after changes.
+# 
+# **Dependencies**: nb-av01-generic-functions
+# 
+# **Test Coverage**:
 # - Path construction and layer mapping (pure functions)
 # - Transform functions (DataFrame operations)
 # - Surrogate key generation (critical dimensional modeling logic)
 # - GX expectation building (validation setup)
 # - Transform pipeline execution (orchestration logic)
-# # **Not Tested** (external dependencies):
+# 
+# **Not Tested** (external dependencies):
 # - Metadata queries (require SQL database)
 # - Logging functions (require SQL database)
 # - File operations (require OneLake access)

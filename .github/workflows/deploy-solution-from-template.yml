@@ -9,31 +9,32 @@ on:
         type: string
         default: "config/v01/v01-template.yml"
 
+env:
+  PYTHON_VERSION: '3.12'
+
 jobs:
   deploy-fabric-infrastructure:
     runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
 
-      - name: Install pip & Fabric CLI
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r config/requirements.txt
+    # Common environment variables for all steps
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      SPN_OBJECT_ID: ${{ secrets.SPN_OBJECT_ID }}
+      GITHUB_PAT: ${{ secrets.GH_PAT }}
+      CONFIG_FILE: ${{ inputs.config_file }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -r config/requirements.txt
 
       - name: Run solution generator
-        run: |
-          python config/generate_solution_from_yml_simple.py
-        working-directory: ${{ github.workspace }}
-        env:
-          CONFIG_FILE: ${{ github.event.inputs.config_file }}
-          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
-          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
-          SPN_OBJECT_ID: ${{ secrets.SPN_OBJECT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          GITHUB_PAT: ${{ secrets.GH_PAT }}
-          PYTHONUTF8: 1
-          PYTHONIOENCODING: utf-8
+        run: python config/generate_solution_from_yml_simple.py

@@ -5,7 +5,7 @@
       "name": "LH_WORKSPACE_NAME",
       "note": "",
       "type": "String",
-      "value": "av01-feature-sprint6-metadata-datastores"
+      "value": "av01-bugfix-deployment-issues-datastores"
     },
     {
       "name": "BRONZE_LH_NAME",
@@ -29,55 +29,55 @@
       "name": "METADATA_SERVER",
       "note": "",
       "type": "String",
-      "value": "qg24idc5hohevps4xga52ehiqi-frsrlvtzgzkejjfsbsg635hg2i"
+      "value": "qg24idc5hohevps4xga52ehiqi-6abwrtfupnyuvmznp6m4gbotyq"
     },
     {
       "name": "METADATA_DB",
       "note": "",
       "type": "String",
-      "value": "fs-av01-admin-8f2ac609-ba1c-439f-ba45-4c7988dff50b"
+      "value": "fs-av01-admin-d0dce713-a2aa-4e13-9b91-c8edd559bb51"
     },
     {
       "name": "_0_INGEST_NOTEBOOK_ID",
       "note": "",
       "type": "String",
-      "value": "10ec12ab-f58f-41f7-9ebd-b6f7fe17e89d"
+      "value": "aeec63e3-89a7-4b4b-bec4-1b7f2f48094b"
     },
     {
       "name": "_1_LOAD_NOTEBOOK_ID",
       "note": "",
       "type": "String",
-      "value": "72c20aa6-d620-4e78-94f1-1e150f0fe28b"
+      "value": "81d6438b-3006-40a7-86f7-7b506ce3733c"
     },
     {
       "name": "_2_CLEAN_NOTEBOOK_ID",
       "note": "",
       "type": "String",
-      "value": "7a8b7e7a-1161-437e-9f1d-710fbc931840"
+      "value": "812de703-6fda-4ff3-be4d-8bb8cd9da8ff"
     },
     {
       "name": "_3_MODEL_NOTEBOOK_ID",
       "note": "",
       "type": "String",
-      "value": "4662e52c-5cd6-4f0d-9d2d-aff6ae4627bb"
+      "value": "ca4eec67-ca89-4404-ac1a-457e2b507618"
     },
     {
       "name": "_4_VALIDATE_NOTEBOOK_ID",
       "note": "",
       "type": "String",
-      "value": "c9fd7af0-079c-4c82-a306-236728a0f6bb"
+      "value": "73882cad-974d-44df-a452-e71384704169"
     },
     {
       "name": "PROCESSING_WORKSPACE_ID",
       "note": "",
       "type": "String",
-      "value": "d615652c-3679-4454-a4b2-0c8dedf4e6d2"
+      "value": "cc6803f0-7bb4-4a71-b32d-7f99c305d3c4"
     },
     {
       "name": "ENVIRONMENT_ID",
       "note": "",
       "type": "String",
-      "value": "883424fb-8d67-4247-b060-da2d104af0d2"
+      "value": "4318348e-9065-43e3-9be2-1cac30dd89cc"
     },
     {
       "name": "ENVIRONMENT_NAME",

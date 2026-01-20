@@ -22,10 +22,14 @@
 # MARKDOWN ********************
 
 # # nb-av01-3-model
-# # **Purpose**: Transform Silver data to Gold using business modeling rules.
-# # **Stage**: Silver → Gold
-# # **Dependencies**: nb-av01-generic-functions
-# # **Metadata**: instructions.transformations (dest_layer='gold'), metadata.transform_store
+# 
+# **Purpose**: Transform Silver data to Gold using business modeling rules.
+# 
+# **Stage**: Silver → Gold
+# 
+# **Dependencies**: nb-av01-generic-functions
+# 
+# **Metadata**: instructions.transformations (dest_layer='gold'), metadata.transform_store
 
 # MARKDOWN ********************
 

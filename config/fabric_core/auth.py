@@ -11,8 +11,8 @@ def auth():
     Returns:
         bool: True if authentication succeeded, False otherwise
     """
-    result = run_command([get_fabric_cli_path(), 'auth', 'login', '-u', os.getenv('SPN_CLIENT_ID'),
-                         '-p', os.getenv('SPN_CLIENT_SECRET'), '--tenant', os.getenv('AZURE_TENANT_ID')])
+    result = run_command([get_fabric_cli_path(), 'auth', 'login', '-u', os.getenv('AZURE_CLIENT_ID'),
+                         '-p', os.getenv('AZURE_CLIENT_SECRET'), '--tenant', os.getenv('AZURE_TENANT_ID')])
 
     if result.returncode != 0:
         print("Authentication failed")
