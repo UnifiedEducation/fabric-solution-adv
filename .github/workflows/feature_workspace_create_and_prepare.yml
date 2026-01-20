@@ -13,14 +13,28 @@ on:
         type: string
         default: "processing,datastores"
 
+env:
+  PYTHON_VERSION: '3.12'
+
 jobs:
   create-feature-workspaces:
     runs-on: windows-latest
     permissions:
       contents: write
+
+    # Common environment variables for all steps
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      GITHUB_PAT: ${{ secrets.GH_PAT }}
+      FEATURE_BRANCH_NAME: ${{ inputs.feature_branch_name }}
+      WORKSPACES_TO_CREATE: ${{ inputs.workspaces_to_be_created }}
+      GITHUB_ACTIONS: true
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -31,28 +45,12 @@ jobs:
           git checkout -b ${{ inputs.feature_branch_name }}
           git push -u origin ${{ inputs.feature_branch_name }}
 
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install pip & requirements
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r config/requirements.txt
+      - name: Install dependencies
+        run: pip install -r config/requirements.txt
 
       - name: Create feature workspaces
-        env:
-          FEATURE_BRANCH_NAME: ${{ inputs.feature_branch_name }}
-          WORKSPACES_TO_CREATE: ${{ inputs.workspaces_to_be_created }}
-          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
-          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          GITHUB_PAT: ${{ secrets.GH_PAT }}
-          GITHUB_ACTIONS: true
-          PYTHONUTF8: 1
-          PYTHONIOENCODING: utf-8
-        run: |
-          chcp 65001
-          python config/scripts/create_feature_workspaces.py
+        run: python config/scripts/create_feature_workspaces.py

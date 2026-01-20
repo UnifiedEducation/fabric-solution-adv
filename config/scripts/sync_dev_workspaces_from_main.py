@@ -24,11 +24,6 @@ from fabric_core.utils import load_config
 # fmt: on
 
 
-# Ensure UTF-8 encoding for stdout
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8')
-
-
 def main():
     # Load environment variables if not in GitHub Actions
     if not os.getenv('GITHUB_ACTIONS'):
