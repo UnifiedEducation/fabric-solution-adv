@@ -26,6 +26,17 @@ jobs:
     name: Deploy to TEST
     runs-on: windows-latest
 
+    # Common environment variables for all steps
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TEST_DATASTORES_WORKSPACE_ID: ${{ vars.TEST_DATASTORES_WORKSPACE_ID }}
+      TEST_PROCESSING_WORKSPACE_ID: ${{ vars.TEST_PROCESSING_WORKSPACE_ID }}
+      TEST_CONSUMPTION_WORKSPACE_ID: ${{ vars.TEST_CONSUMPTION_WORKSPACE_ID }}
+      GITHUB_ACTIONS: true
+
     steps:
       - uses: actions/checkout@v4
 
@@ -37,61 +48,31 @@ jobs:
         run: pip install -r config/requirements.txt
 
       - name: Resume TEST capacities
-        env:
-          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
-          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          GITHUB_ACTIONS: true
         run: |
           python config/scripts/manage_capacity.py `
             --environment TEST --action resume --wait
 
       - name: Deploy all workspaces to TEST
-        env:
-          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
-          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
-          TEST_DATASTORES_WORKSPACE_ID: ${{ vars.TEST_DATASTORES_WORKSPACE_ID }}
-          TEST_PROCESSING_WORKSPACE_ID: ${{ vars.TEST_PROCESSING_WORKSPACE_ID }}
-          TEST_CONSUMPTION_WORKSPACE_ID: ${{ vars.TEST_CONSUMPTION_WORKSPACE_ID }}
-          GITHUB_ACTIONS: true
         run: |
           python config/scripts/deploy_with_fabric_cicd.py `
             --environment TEST --all-workspaces
 
       - name: Run workspace setup
         if: ${{ inputs.run_workspace_setup }}
-        env:
-          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
-          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          TEST_PROCESSING_WORKSPACE_ID: ${{ vars.TEST_PROCESSING_WORKSPACE_ID }}
-          GITHUB_ACTIONS: true
         run: |
-          python config/scripts/run_workspace_setup.py --environment TEST
+          python config/scripts/run_fabric_notebook.py `
+            --workspace-id ${{ vars.TEST_PROCESSING_WORKSPACE_ID }} `
+            --notebook-id ${{ vars.TEST_SETUP_NOTEBOOK_ID }}
 
       - name: Run unit tests
         if: ${{ inputs.run_unit_tests }}
-        env:
-          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
-          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          TEST_PROCESSING_WORKSPACE_ID: ${{ vars.TEST_PROCESSING_WORKSPACE_ID }}
-          GITHUB_ACTIONS: true
         run: |
-          python config/scripts/run_unit_tests.py --environment TEST
+          python config/scripts/run_fabric_notebook.py `
+            --workspace-id ${{ vars.TEST_PROCESSING_WORKSPACE_ID }} `
+            --notebook-id ${{ vars.TEST_UNIT_TESTS_NOTEBOOK_ID }}
 
       - name: Suspend TEST capacities
         if: ${{ always() && !inputs.skip_capacity_suspend }}
-        env:
-          SPN_CLIENT_ID: ${{ secrets.SPN_CLIENT_ID }}
-          SPN_CLIENT_SECRET: ${{ secrets.SPN_CLIENT_SECRET }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          GITHUB_ACTIONS: true
         run: |
           python config/scripts/manage_capacity.py `
             --environment TEST --action suspend
