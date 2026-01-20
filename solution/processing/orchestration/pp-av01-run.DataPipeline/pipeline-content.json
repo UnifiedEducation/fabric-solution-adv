@@ -20,7 +20,8 @@
           "workspaceId": {
             "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
             "type": "Expression"
-          }
+          },
+          "sessionTag": "sesh"
         }
       },
       {
@@ -49,7 +50,8 @@
           "workspaceId": {
             "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
             "type": "Expression"
-          }
+          },
+          "sessionTag": "sesh"
         }
       },
       {
@@ -78,7 +80,8 @@
           "workspaceId": {
             "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
             "type": "Expression"
-          }
+          },
+          "sessionTag": "sesh"
         }
       },
       {
@@ -107,7 +110,8 @@
           "workspaceId": {
             "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
             "type": "Expression"
-          }
+          },
+          "sessionTag": "sesh"
         }
       },
       {
@@ -136,7 +140,8 @@
           "workspaceId": {
             "value": "@pipeline().libraryVariables.vlav01variables_PROCESSING_WORKSPACE_ID",
             "type": "Expression"
-          }
+          },
+          "sessionTag": "sesh"
         }
       }
     ],

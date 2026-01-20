@@ -12,32 +12,24 @@
 # MARKDOWN ********************
 
 # # nb-av01-new-workspace-setup
-# # **Purpose**: Initialize a new workspace/environment with all required objects.
-# # **Usage**: Run once when creating a new workspace (e.g., for feature development).
-# # **Steps**:
-# 1. Create Lakehouse schemas and tables
-# 2. Publish environment (required after Git branch-out)
-# 3. Seed metadata SQL database
+# 
+# **Purpose**: Initialize a new workspace/environment, after deployment. This includes populating Lakehosues, publishing the Environment, and initializing the Metadata database with metadata. 
+# 
+# Optional toggles to turn steps on/off. (These are also notebook params, should you wish to parameterize the notebook).
+# 
+# **Trigger: ** this notebook is nearly always triggered automatically as part of the GitHub Actions. 
+# 
+# **Usage**: Run once when creating a new workspace (e.g., for feature development).
+# 
+# **Steps**:
+# - Create Lakehouse schemas and tables
+# - Publish environment (required after Git branch-out)
+# - Seed metadata SQL database
+# - Run the full pipeline all the way through. 
 
 # MARKDOWN ********************
 
-# ## Parameters
-
-# PARAMETERS CELL ********************
-
-init_lakehouses = True
-init_metadata_sql = True
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# MARKDOWN ********************
-
-# ## Runtime Environment Configuration
+# #### Runtime Environment Configuration
 
 
 # CELL ********************
@@ -58,79 +50,35 @@ init_metadata_sql = True
 # META   "language_group": "synapse_pyspark"
 # META }
 
-# MARKDOWN ********************
+# PARAMETERS CELL ********************
 
-# ## Step 1: Create Lakehouse Objects
+init_lakehouses = True
+init_metadata_sql = True
+run_pipeline = True
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
 
 # CELL ********************
 
-import notebookutils
-
-if init_lakehouses:
-    print("Creating lakehouse schemas and tables...")
+# Step 1: Populate Lakehouses 
+if init_lakehouses == True: 
     notebookutils.notebook.run("nb-av01-lhcreate-all")
-    print("Lakehouse creation complete.")
-else:
-    print("Skipping lakehouse creation (init_lakehouses=False)")
+    
+# Step 2: publish environment 
+notebookutils.notebook.run("nb-av01-publish-environment")
 
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# MARKDOWN ********************
-
-# ## Step 2: Publish Environment
-# # When using Git branch-out or deployment, environments become unpublished in the new workspace.
-# This step re-publishes the environment using the Fabric REST API.
-
-# CELL ********************
-
-import sempy.fabric as fabric
-
-# Initialize Fabric REST API client
-client = fabric.FabricRestClient()
-
-# Get workspace and environment IDs from Variable Library
-variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
-workspace_id = variables.PROCESSING_WORKSPACE_ID
-environment_id = variables.ENVIRONMENT_ID
-
-# Build endpoint URL (preview API requires beta flag)
-# Ref: https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/publish-environment
-FABRIC_API_BETA = True
-endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}/staging/publish?beta={FABRIC_API_BETA}"
-
-# Publish environment with error handling
-try:
-    response = client.post(path_or_url=endpoint)
-    print(f"Environment published successfully (status: {response.status_code})")
-except Exception as e:
-    # This may fail if environment is already published or doesn't need publishing
-    print(f"Note: Environment publish returned: {e}")
-    print("This is often expected if the environment is already published.")
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# MARKDOWN ********************
-
-# ## Step 3: Seed Metadata SQL Database
-
-# CELL ********************
-
-if init_metadata_sql:
-    print("Seeding metadata SQL database...")
+# Step 3: Init SQL Metadata Database
+if init_lakehouses == True: 
     notebookutils.notebook.run("nb-av01-init-sql-database")
-    print("Metadata seeding complete.")
-else:
-    print("Skipping SQL seeding (init_metadata_sql=False)")
+
+# Step 4: Run full ETL pipeline notebook 
+if run_pipeline == True: 
+    notebookutils.notebook.run("nb-av01-run")
 
 # METADATA ********************
 

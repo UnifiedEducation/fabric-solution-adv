@@ -17,10 +17,14 @@
 # MARKDOWN ********************
 
 # # nb-av01-1-load
-# # **Purpose**: Load raw JSON files into Bronze Delta tables using column mappings.
-# # **Stage**: Raw (Files) → Bronze (Delta tables)
-# # **Dependencies**: nb-av01-generic-functions
-# # **Metadata**: instructions.loading, metadata.loading_store, metadata.column_mappings
+# 
+# **Purpose**: Load raw JSON files into Bronze Delta tables using column mappings.
+# 
+# **Stage**: Raw (Files) → Bronze (Delta tables)
+# 
+# **Dependencies**: nb-av01-generic-functions
+# 
+# **Metadata**: instructions.loading, metadata.loading_store, metadata.column_mappings
 
 # MARKDOWN ********************
 

@@ -12,10 +12,16 @@
 # MARKDOWN ********************
 
 # # nb-av01-init-sql-database
-# # **Purpose**: Seed the metadata SQL database with initial configuration data.
-# # **Usage**: Run once per new workspace/environment to populate metadata tables.
-# # **Dependencies**: Requires nb-av01-generic-functions (provides TimestampType, BooleanType, notebookutils)
-# # **Tables Seeded**:
+# 
+# **Purpose**: Seed the metadata SQL database with initial configuration data.
+# 
+# **Usage**: Run once per new workspace/environment to populate metadata tables.
+# 
+# Uses the Spark - MSSQL Connector, [read more here](). 
+# 
+# **Dependencies**: Requires nb-av01-generic-functions (provides TimestampType, BooleanType, notebookutils)
+# 
+# **Tables Seeded**:
 # - metadata.log_store, source_store, loading_store, transform_store, expectation_store, column_mappings
 # - instructions.ingestion, loading, transformations, validations
 
