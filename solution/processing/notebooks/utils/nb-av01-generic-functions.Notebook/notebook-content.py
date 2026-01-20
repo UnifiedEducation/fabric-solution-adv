@@ -49,6 +49,10 @@ import great_expectations.expectations as gxe
 # HTTP
 import requests
 
+# Azure Key Vault (for managed identity auth)
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
+
 # METADATA ********************
 
 # META {
@@ -195,8 +199,9 @@ def get_most_recent_file(base_path: str, folder: str):
 
 def get_api_key_from_keyvault(key_vault_url: str, secret_name: str) -> str:
     """
-    Retrieve API key from Azure Key Vault using notebookutils.
-    Generic utility for any source needing API key authentication.
+    Retrieve API key from Azure Key Vault using managed identity.
+    Uses DefaultAzureCredential which works with workspace identity when
+    notebooks are run via REST API (where notebookutils requires user credentials).
 
     Args:
         key_vault_url: Key Vault URL (e.g., 'https://my-vault.vault.azure.net/')
@@ -204,7 +209,9 @@ def get_api_key_from_keyvault(key_vault_url: str, secret_name: str) -> str:
 
     Returns: Secret value as string
     """
-    return notebookutils.credentials.getSecret(key_vault_url, secret_name)
+    credential = DefaultAzureCredential()
+    client = SecretClient(vault_url=key_vault_url, credential=credential)
+    return client.get_secret(secret_name).value
 
 
 # METADATA ********************
