@@ -53,7 +53,7 @@
 # PARAMETERS CELL ********************
 
 init_lakehouses = True
-init_metadata_sql = False
+init_metadata_sql = True
 run_pipeline = True
 
 # METADATA ********************

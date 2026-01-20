@@ -26,7 +26,7 @@ GO
 INSERT INTO metadata.source_store (source_id, source_name, source_type, auth_method, key_vault_url, secret_name, base_url, description)
 VALUES
 (1, 'youtube_api', 'rest_api', 'api_key',
-    'https://int-akv-restapi-keys.vault.azure.net/',
+    'https://av01-akv-restapi-keys.vault.azure.net/',
     'data-v3-api-key',
     'https://www.googleapis.com/youtube/v3',
     'YouTube Data API v3 - Channel stats, videos, playlists');
