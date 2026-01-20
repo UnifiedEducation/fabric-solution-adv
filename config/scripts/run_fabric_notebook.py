@@ -49,11 +49,26 @@ def run_notebook(workspace_id: str, notebook_id: str, token: str, timeout_minute
         print(f"  {response.text}")
         return False
 
-    # Extract job instance ID from response
-    job_instance_id = response.json().get("id")
+    # Extract job instance ID - try response body first, then Location header
+    job_instance_id = None
+
+    # Try JSON body first
+    if response.text:
+        try:
+            job_instance_id = response.json().get("id")
+        except requests.exceptions.JSONDecodeError:
+            pass
+
+    # Fall back to Location header (format: .../jobs/instances/{jobInstanceId})
+    if not job_instance_id:
+        location = response.headers.get("Location", "")
+        if "/jobs/instances/" in location:
+            job_instance_id = location.split("/jobs/instances/")[-1]
+
     if not job_instance_id:
         print("Failed to get job instance ID from response")
-        print(f"  Response: {response.text}")
+        print(f"  Headers: {dict(response.headers)}")
+        print(f"  Body: {response.text}")
         return False
 
     print(f"Notebook started (job ID: {job_instance_id})")
