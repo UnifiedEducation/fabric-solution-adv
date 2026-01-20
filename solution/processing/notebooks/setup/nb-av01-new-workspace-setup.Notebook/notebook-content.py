@@ -12,12 +12,9 @@
 # MARKDOWN ********************
 
 # # nb-av01-new-workspace-setup
-#
-# **Purpose**: Initialize a new workspace/environment with all required objects.
-#
-# **Usage**: Run once when creating a new workspace (e.g., for feature development).
-#
-# **Steps**:
+# # **Purpose**: Initialize a new workspace/environment with all required objects.
+# # **Usage**: Run once when creating a new workspace (e.g., for feature development).
+# # **Steps**:
 # 1. Create Lakehouse schemas and tables
 # 2. Publish environment (required after Git branch-out)
 # 3. Seed metadata SQL database
@@ -86,8 +83,7 @@ else:
 # MARKDOWN ********************
 
 # ## Step 2: Publish Environment
-#
-# When using Git branch-out or deployment, environments become unpublished in the new workspace.
+# # When using Git branch-out or deployment, environments become unpublished in the new workspace.
 # This step re-publishes the environment using the Fabric REST API.
 
 # CELL ********************

@@ -12,12 +12,9 @@
 # MARKDOWN ********************
 
 # # nb-av01-lhcreate-all
-#
-# **Purpose**: Create all lakehouse schemas and tables for Bronze, Silver, and Gold layers.
-#
-# **Usage**: Run via nb-av01-new-workspace-setup or directly for lakehouse initialization.
-#
-# **Naming**: Uses Spark-SQL four-part naming: `workspace`.`lakehouse`.`schema`.`table`
+# # **Purpose**: Create all lakehouse schemas and tables for Bronze, Silver, and Gold layers.
+# # **Usage**: Run via nb-av01-new-workspace-setup or directly for lakehouse initialization.
+# # **Naming**: Uses Spark-SQL four-part naming: `workspace`.`lakehouse`.`schema`.`table`
 
 # MARKDOWN ********************
 
@@ -41,8 +38,7 @@ lh_workspace_name = variables.LH_WORKSPACE_NAME
 # MARKDOWN ********************
 
 # ## Lakehouse Schema Definitions
-#
-# Table definitions for each layer (Bronze, Silver, Gold).
+# # Table definitions for each layer (Bronze, Silver, Gold).
 
 # CELL ********************
 
