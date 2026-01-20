@@ -17,6 +17,34 @@
     {
       "name": "METADATA_DB",
       "value": ""
+    },
+    {
+      "name": "_1_LOAD_NOTEBOOK_ID",
+      "value": ""
+    },
+    {
+      "name": "_2_CLEAN_NOTEBOOK_ID",
+      "value": ""
+    },
+    {
+      "name": "_3_MODEL_NOTEBOOK_ID",
+      "value": ""
+    },
+    {
+      "name": "_4_VALIDATE_NOTEBOOK_ID",
+      "value": ""
+    },
+    {
+      "name": "_0_INGEST_NOTEBOOK_ID",
+      "value": ""
+    },
+    {
+      "name": "PROCESSING_WORKSPACE_ID",
+      "value": ""
+    },
+    {
+      "name": "ENVIRONMENT_ID",
+      "value": ""
     }
   ]
 }

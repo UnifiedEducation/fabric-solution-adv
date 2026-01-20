@@ -12,11 +12,39 @@
     },
     {
       "name": "METADATA_SERVER",
-      "value": ""
+      "value": "qg24idc5hohevps4xga52ehiqi-5h22yt2gym7eppmvz6jgs5ishy"
     },
     {
       "name": "METADATA_DB",
-      "value": ""
+      "value": "fs-av01-admin-e635a014-54ec-4c7f-82d2-9e25a4f6836d"
+    },
+    {
+      "name": "PROCESSING_WORKSPACE_ID",
+      "value": "4facf5e9-c346-473e-bd95-cf926975123e"
+    },
+    {
+      "name": "ENVIRONMENT_ID",
+      "value": "1c4f16d3-5c42-4fc4-b526-a231ab5d1d9e"
+    },
+    {
+      "name": "_0_INGEST_NOTEBOOK_ID",
+      "value": "c1c086a7-1900-49ea-a6c2-11883978d7f4"
+    },
+    {
+      "name": "_1_LOAD_NOTEBOOK_ID",
+      "value": "ebd162c3-e4e8-4759-8fc9-91c55d245cd9"
+    },
+    {
+      "name": "_2_CLEAN_NOTEBOOK_ID",
+      "value": "99ba1337-a8a7-471c-b446-e403db5a37a0"
+    },
+    {
+      "name": "_3_MODEL_NOTEBOOK_ID",
+      "value": "ef89aba2-6134-4c7d-8e3b-cb8f60c7f9be"
+    },
+    {
+      "name": "_4_VALIDATE_NOTEBOOK_ID",
+      "value": "81dbc95d-5afd-48c4-bb27-ae47723b5426"
     }
   ]
 }
