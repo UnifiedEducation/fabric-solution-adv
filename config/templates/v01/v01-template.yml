@@ -138,6 +138,7 @@ deployment:
       - DataPipeline
       - Environment
       - VariableLibrary
+      - SQLDatabase
     datastores:
       - Lakehouse
     consumption:
