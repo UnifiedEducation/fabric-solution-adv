@@ -65,20 +65,20 @@ run_pipeline = True
 
 # CELL ********************
 
-# Step 1: Populate Lakehouses 
-if init_lakehouses == True: 
-    notebookutils.notebook.run("nb-av01-lhcreate-all")
-    
-# Step 2: publish environment 
-notebookutils.notebook.run("nb-av01-publish-environment")
+# Step 1: Populate Lakehouses
+if init_lakehouses == True:
+    notebookutils.notebook.run("nb-av01-lhcreate-all", 300)
+
+# Step 2: publish environment
+notebookutils.notebook.run("nb-av01-publish-environment", 300)
 
 # Step 3: Init SQL Metadata Database
-if init_lakehouses == True: 
-    notebookutils.notebook.run("nb-av01-init-sql-database")
+if init_lakehouses == True:
+    notebookutils.notebook.run("nb-av01-init-sql-database", 300)
 
-# Step 4: Run full ETL pipeline notebook 
-if run_pipeline == True: 
-    notebookutils.notebook.run("nb-av01-run")
+# Step 4: Run full ETL pipeline notebook
+if run_pipeline == True:
+    notebookutils.notebook.run("nb-av01-run", 1800)
 
 # METADATA ********************
 

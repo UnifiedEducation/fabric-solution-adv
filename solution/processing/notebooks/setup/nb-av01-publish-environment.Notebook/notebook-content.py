@@ -38,14 +38,26 @@ environment_id = variables.ENVIRONMENT_ID
 FABRIC_API_BETA = True
 endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}/staging/publish?beta={FABRIC_API_BETA}"
 
-# Publish environment with error handling
-try:
-    response = client.post(path_or_url=endpoint)
-    print(f"Environment published successfully (status: {response.status_code})")
-except Exception as e:
-    # This may fail if environment is already published or doesn't need publishing
-    print(f"Note: Environment publish returned: {e}")
-    print("This is often expected if the environment is already published.")
+# Check if environment is already published before attempting to publish
+get_env_endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}"
+status_response = client.get(path_or_url=get_env_endpoint)
+env_data = status_response.json()
+current_state = env_data.get("properties", {}).get("publishDetails", {}).get("state")
+
+print(f"Current environment publish state: {current_state}")
+
+if current_state == "Success":
+    print("Environment is already published - skipping publish step")
+    needs_polling = False
+else:
+    # Attempt to publish
+    needs_polling = True
+    try:
+        response = client.post(path_or_url=endpoint)
+        print(f"Environment publish initiated (status: {response.status_code})")
+    except Exception as e:
+        print(f"Note: Environment publish returned: {e}")
+        print("This may be expected if fabric-cicd already published the environment.")
 
 
 
@@ -63,38 +75,40 @@ except Exception as e:
 
 # CELL ********************
 
-# Poll for publish completion
+# Poll for publish completion (only if we initiated a publish)
 # Ref: https://learn.microsoft.com/en-us/rest/api/fabric/environment/items/get-environment
 
-get_env_endpoint = f"https://api.fabric.microsoft.com/v1/workspaces/{workspace_id}/environments/{environment_id}"
-poll_interval_seconds = 30
-max_wait_minutes = 15
-max_attempts = (max_wait_minutes * 60) // poll_interval_seconds
+if needs_polling:
+    poll_interval_seconds = 30
+    max_wait_minutes = 15
+    max_attempts = (max_wait_minutes * 60) // poll_interval_seconds
 
-print(f"Waiting for environment to publish (polling every {poll_interval_seconds}s, max {max_wait_minutes} min)...")
+    print(f"Waiting for environment to publish (polling every {poll_interval_seconds}s, max {max_wait_minutes} min)...")
 
-for attempt in range(1, max_attempts + 1):
-    try:
-        status_response = client.get(path_or_url=get_env_endpoint)
-        env_data = status_response.json()
+    for attempt in range(1, max_attempts + 1):
+        try:
+            status_response = client.get(path_or_url=get_env_endpoint)
+            env_data = status_response.json()
 
-        publish_state = env_data.get("properties", {}).get("publishDetails", {}).get("state")
-        print(f"  Attempt {attempt}/{max_attempts}: publishDetails.state = {publish_state}")
+            publish_state = env_data.get("properties", {}).get("publishDetails", {}).get("state")
+            print(f"  Attempt {attempt}/{max_attempts}: publishDetails.state = {publish_state}")
 
-        if publish_state == "Success":
-            print("Environment published successfully!")
-            break
-        elif publish_state == "Failed":
-            raise Exception(f"Environment publish failed. Response: {env_data}")
+            if publish_state == "Success":
+                print("Environment published successfully!")
+                break
+            elif publish_state == "Failed":
+                raise Exception(f"Environment publish failed. Response: {env_data}")
 
-        # Still running or other state - wait and retry
-        time.sleep(poll_interval_seconds)
+            # Still running or other state - wait and retry
+            time.sleep(poll_interval_seconds)
 
-    except Exception as e:
-        print(f"  Error checking status: {e}")
-        time.sleep(poll_interval_seconds)
+        except Exception as e:
+            print(f"  Error checking status: {e}")
+            time.sleep(poll_interval_seconds)
+    else:
+        raise Exception(f"Environment publish did not complete within {max_wait_minutes} minutes")
 else:
-    raise Exception(f"Environment publish did not complete within {max_wait_minutes} minutes")
+    print("Skipping polling - environment already published")
 
 # METADATA ********************
 

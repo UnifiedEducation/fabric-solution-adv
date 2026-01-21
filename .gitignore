@@ -7,3 +7,4 @@ wip/**
 *.pyc
 config/**.pyc
 /config/fabric_core/__pycache__
+test_keyvault.py

@@ -56,6 +56,25 @@
 
 # CELL ********************
 
+# Parameters - can be passed via REST API execution
+# These are optional; if not provided, notebookutils.credentials.getSecret() is used (requires user credentials)
+spn_tenant_id = ""
+spn_client_id = ""
+spn_client_secret = ""
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+# Configure SPN credentials for Key Vault access if provided
+if spn_tenant_id and spn_client_id and spn_client_secret:
+    set_spn_credentials(spn_tenant_id, spn_client_id, spn_client_secret)
+
 # Load workspace-specific variables from Variable Library
 # Provides: LH_WORKSPACE_NAME, BRONZE_LH_NAME, SILVER_LH_NAME, GOLD_LH_NAME, METADATA_SERVER, METADATA_DB
 variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")

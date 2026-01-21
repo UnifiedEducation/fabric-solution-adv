@@ -12,11 +12,11 @@
     },
     {
       "name": "METADATA_SERVER",
-      "value": ""
+      "value": "qg24idc5hohevps4xga52ehiqi-7ihddr5maide5ihsghdvizl2qu"
     },
     {
       "name": "METADATA_DB",
-      "value": ""
+      "value": "fs-av01-admin-8b73b694-3091-43f4-9203-bd03dc933e96"
     },
     {
       "name": "_1_LOAD_NOTEBOOK_ID",
@@ -40,11 +40,11 @@
     },
     {
       "name": "PROCESSING_WORKSPACE_ID",
-      "value": ""
+      "value": "c7310efa-02ac-4e06-a0f2-31c754657a85"
     },
     {
       "name": "ENVIRONMENT_ID",
-      "value": ""
+      "value": "4aeb7e20-7ab4-4345-bbcf-8a353aa4c772"
     }
   ]
 }

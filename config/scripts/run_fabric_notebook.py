@@ -7,6 +7,8 @@ Waits for completion and returns success/failure based on notebook execution res
 Usage:
     python run_fabric_notebook.py --workspace-id <id> --notebook-id <id>
     python run_fabric_notebook.py -w <id> -n <id> --timeout 60
+    python run_fabric_notebook.py -w <id> -n <id> --param key1=value1 --param key2=value2
+    python run_fabric_notebook.py -w <id> -n <id> --pass-spn-credentials
 """
 
 import os
@@ -14,6 +16,7 @@ import sys
 import time
 import argparse
 import requests
+import json
 from azure.identity import ClientSecretCredential
 
 DEFAULT_TIMEOUT_MINUTES = 30
@@ -31,18 +34,33 @@ def get_fabric_token() -> str:
     return token.token
 
 
-def run_notebook(workspace_id: str, notebook_id: str, token: str, timeout_minutes: int) -> bool:
+def run_notebook(workspace_id: str, notebook_id: str, token: str, timeout_minutes: int,
+                 parameters: dict = None) -> bool:
     """
     Execute a notebook via the Fabric REST API and wait for completion.
+
+    Args:
+        workspace_id: Fabric workspace ID
+        notebook_id: Notebook item ID
+        token: Fabric API access token
+        timeout_minutes: Maximum time to wait for completion
+        parameters: Optional dict of notebook parameters to pass
 
     Returns True if notebook completed successfully, False otherwise.
     """
     base_url = "https://api.fabric.microsoft.com/v1"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
+    # Build request body with parameters if provided
+    request_body = {}
+    if parameters:
+        request_body["executionData"] = {"parameters": parameters}
+        # Print parameter names (not values, for security)
+        print(f"Parameters: {list(parameters.keys())}")
+
     # Start the notebook
     start_url = f"{base_url}/workspaces/{workspace_id}/items/{notebook_id}/jobs/instances?jobType=RunNotebook"
-    response = requests.post(start_url, headers=headers, json={})
+    response = requests.post(start_url, headers=headers, json=request_body)
 
     if response.status_code not in [200, 201, 202]:
         print(f"Failed to start notebook (HTTP {response.status_code})")
@@ -114,15 +132,26 @@ def main():
     parser.add_argument("--notebook-id", "-n", required=True, help="Notebook ID to execute")
     parser.add_argument("--timeout", "-t", type=int, default=DEFAULT_TIMEOUT_MINUTES,
                         help=f"Timeout in minutes (default: {DEFAULT_TIMEOUT_MINUTES})")
+    parser.add_argument("--pass-spn-credentials", action="store_true",
+                        help="Pass SPN credentials (from env vars) to notebook for Key Vault access")
     args = parser.parse_args()
 
     print(f"Workspace: {args.workspace_id}")
     print(f"Notebook:  {args.notebook_id}")
     print(f"Timeout:   {args.timeout} minutes")
+
+    # Build parameters dict if SPN credentials should be passed
+    parameters = None
+    if args.pass_spn_credentials:
+        parameters = {
+            "spn_tenant_id": os.environ["AZURE_TENANT_ID"],
+            "spn_client_id": os.environ["AZURE_CLIENT_ID"],
+            "spn_client_secret": os.environ["AZURE_CLIENT_SECRET"]
+        }
     print()
 
     token = get_fabric_token()
-    success = run_notebook(args.workspace_id, args.notebook_id, token, args.timeout)
+    success = run_notebook(args.workspace_id, args.notebook_id, token, args.timeout, parameters)
 
     sys.exit(0 if success else 1)
 

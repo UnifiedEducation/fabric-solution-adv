@@ -49,6 +49,9 @@ import great_expectations.expectations as gxe
 # HTTP
 import requests
 
+# MSAL for SPN authentication to Key Vault
+import msal
+
 # METADATA ********************
 
 # META {
@@ -97,6 +100,20 @@ import com.microsoft.sqlserver.jdbc.spark
 
 # SQL Database connection - must be set via set_metadata_db_url() before use
 METADATA_DB_URL = None
+
+# SPN credentials for Key Vault access (set when running via REST API)
+SPN_TENANT_ID = None
+SPN_CLIENT_ID = None
+SPN_CLIENT_SECRET = None
+
+
+def set_spn_credentials(tenant_id: str, client_id: str, client_secret: str):
+    """Configure SPN credentials for Key Vault access when running via REST API."""
+    global SPN_TENANT_ID, SPN_CLIENT_ID, SPN_CLIENT_SECRET
+    SPN_TENANT_ID = tenant_id
+    SPN_CLIENT_ID = client_id
+    SPN_CLIENT_SECRET = client_secret
+    print("SPN credentials configured for Key Vault access")
 
 
 def set_metadata_db_url(server: str, database: str):
@@ -195,8 +212,9 @@ def get_most_recent_file(base_path: str, folder: str):
 
 def get_api_key_from_keyvault(key_vault_url: str, secret_name: str) -> str:
     """
-    Retrieve API key from Azure Key Vault using notebookutils.
-    Generic utility for any source needing API key authentication.
+    Retrieve API key from Azure Key Vault.
+
+    Uses MSAL with SPN credentials if configured, otherwise uses notebookutils (interactive).
 
     Args:
         key_vault_url: Key Vault URL (e.g., 'https://my-vault.vault.azure.net/')
@@ -204,7 +222,27 @@ def get_api_key_from_keyvault(key_vault_url: str, secret_name: str) -> str:
 
     Returns: Secret value as string
     """
-    return notebookutils.credentials.getSecret(key_vault_url, secret_name)
+    if SPN_CLIENT_ID:
+        # Use MSAL to get a token, then call Key Vault REST API directly
+        app = msal.ConfidentialClientApplication(
+            SPN_CLIENT_ID,
+            authority=f"https://login.microsoftonline.com/{SPN_TENANT_ID}",
+            client_credential=SPN_CLIENT_SECRET
+        )
+        result = app.acquire_token_for_client(scopes=["https://vault.azure.net/.default"])
+
+        if "access_token" not in result:
+            raise Exception(f"Failed to get token: {result.get('error_description')}")
+
+        # Call Key Vault REST API
+        url = f"{key_vault_url.rstrip('/')}/secrets/{secret_name}?api-version=7.4"
+        headers = {"Authorization": f"Bearer {result['access_token']}"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()["value"]
+    else:
+        # Use notebookutils for interactive execution (requires user credentials)
+        return notebookutils.credentials.getSecret(key_vault_url, secret_name)
 
 
 # METADATA ********************
