@@ -37,15 +37,15 @@
 
 # CELL ********************
 
-notebookutils.notebook.run("nb-av01-0-ingest-api")
+notebookutils.notebook.run("nb-av01-0-ingest-api", 300)
 
-notebookutils.notebook.run("nb-av01-1-load")
-    
-notebookutils.notebook.run("nb-av01-2-clean")
+notebookutils.notebook.run("nb-av01-1-load", 300)
 
-notebookutils.notebook.run("nb-av01-3-model")
+notebookutils.notebook.run("nb-av01-2-clean", 300)
 
-notebookutils.notebook.run("nb-av01-4-validate")
+notebookutils.notebook.run("nb-av01-3-model", 300)
+
+notebookutils.notebook.run("nb-av01-4-validate", 300)
 
 # METADATA ********************
 
