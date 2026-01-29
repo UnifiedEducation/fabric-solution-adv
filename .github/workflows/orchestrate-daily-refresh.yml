@@ -37,7 +37,8 @@ jobs:
       - name: Resume PROD capacities
         run: |
           python config/scripts/manage_capacity.py `
-            --environment PROD --action resume --wait
+            --environment PROD --action resume --wait `
+            --workspace-type processing datastores
 
       - name: Run daily refresh notebook
         run: |
@@ -49,4 +50,5 @@ jobs:
         if: ${{ always() }}
         run: |
           python config/scripts/manage_capacity.py `
-            --environment PROD --action suspend
+            --environment PROD --action suspend `
+            --workspace-type processing datastores

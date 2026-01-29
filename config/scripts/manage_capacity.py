@@ -27,7 +27,8 @@ from fabric_core.capacity import suspend_capacity
 from fabric_core.utils import call_azure_api, load_config
 
 
-def get_capacities_for_environment(environment: str, config: dict) -> list:
+def get_capacities_for_environment(environment: str, config: dict,
+                                    workspace_types: list = None) -> list:
     """
     Get capacity names for a given environment from config.
 
@@ -36,6 +37,7 @@ def get_capacities_for_environment(environment: str, config: dict) -> list:
     Args:
         environment: Target environment (TEST, PROD)
         config: Loaded workspace configuration (v01-template.yml)
+        workspace_types: Optional list of workspace types to filter by (e.g., ['processing', 'datastores'])
 
     Returns:
         list: Unique capacity names for the environment
@@ -47,6 +49,12 @@ def get_capacities_for_environment(environment: str, config: dict) -> list:
         ws_name = workspace.get('name', '').lower()
         # Match workspaces for this environment (e.g., "-test-" in name)
         if f"-{env_lower}-" in ws_name:
+            # Filter by workspace type if specified
+            if workspace_types:
+                ws_type = workspace.get('type', '').lower()
+                if ws_type not in [t.lower() for t in workspace_types]:
+                    continue
+
             capacity = workspace.get('capacity', '')
             if capacity:
                 # Resolve template variables
@@ -143,7 +151,8 @@ def wait_for_capacity_active(capacity_name: str, subscription_id: str, resource_
 
 def manage_capacities(environment: str, action: str, config: dict,
                       subscription_id: str, resource_group: str,
-                      wait: bool = False) -> bool:
+                      wait: bool = False,
+                      workspace_types: list = None) -> bool:
     """
     Resume or suspend all capacities for an environment.
 
@@ -154,11 +163,12 @@ def manage_capacities(environment: str, action: str, config: dict,
         subscription_id: Azure subscription ID
         resource_group: Azure resource group name
         wait: Wait for capacities to reach target state (resume only)
+        workspace_types: Optional list of workspace types to filter capacities by
 
     Returns:
         bool: True if all operations succeeded
     """
-    capacities = get_capacities_for_environment(environment, config)
+    capacities = get_capacities_for_environment(environment, config, workspace_types)
 
     if not capacities:
         print(f"No capacities found for {environment}")
@@ -211,6 +221,8 @@ Examples:
                         help='Action to perform')
     parser.add_argument('--wait', '-w', action='store_true',
                         help='Wait for capacities to reach target state (resume only)')
+    parser.add_argument('--workspace-type', nargs='+', default=None,
+                        help='Filter capacities to those used by these workspace types (e.g., processing datastores)')
     parser.add_argument('--config', '-c', default='config/templates/v01/v01-template.yml',
                         help='Path to solution template configuration file')
 
@@ -257,9 +269,10 @@ Examples:
     print("="*60)
     print("Capacity Manager")
     print("="*60)
-    print(f"  Environment: {args.environment}")
-    print(f"  Action:      {args.action}")
-    print(f"  Wait:        {args.wait}")
+    print(f"  Environment:     {args.environment}")
+    print(f"  Action:          {args.action}")
+    print(f"  Wait:            {args.wait}")
+    print(f"  Workspace types: {args.workspace_type or 'all'}")
     print()
     print("Authenticating...")
 
@@ -274,7 +287,8 @@ Examples:
         config=config,
         subscription_id=subscription_id,
         resource_group=resource_group,
-        wait=args.wait
+        wait=args.wait,
+        workspace_types=args.workspace_type
     )
 
     if success:
