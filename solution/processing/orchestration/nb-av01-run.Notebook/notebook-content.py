@@ -9,23 +9,6 @@
 # META   "dependencies": {}
 # META }
 
-# CELL ********************
-
-# MAGIC %%configure -f
-# MAGIC {
-# MAGIC     "environment": {
-# MAGIC         "id": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_ID)"},
-# MAGIC         "name": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_NAME)"}
-# MAGIC     }
-# MAGIC }
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
 # MARKDOWN ********************
 
 # #### Run all notebooks in ELTL pipeline. 

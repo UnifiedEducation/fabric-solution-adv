@@ -19,26 +19,6 @@
       "value": "fs-av01-admin-8b73b694-3091-43f4-9203-bd03dc933e96"
     },
     {
-      "name": "_1_LOAD_NOTEBOOK_ID",
-      "value": ""
-    },
-    {
-      "name": "_2_CLEAN_NOTEBOOK_ID",
-      "value": ""
-    },
-    {
-      "name": "_3_MODEL_NOTEBOOK_ID",
-      "value": ""
-    },
-    {
-      "name": "_4_VALIDATE_NOTEBOOK_ID",
-      "value": ""
-    },
-    {
-      "name": "_0_INGEST_NOTEBOOK_ID",
-      "value": ""
-    },
-    {
       "name": "PROCESSING_WORKSPACE_ID",
       "value": "c7310efa-02ac-4e06-a0f2-31c754657a85"
     },

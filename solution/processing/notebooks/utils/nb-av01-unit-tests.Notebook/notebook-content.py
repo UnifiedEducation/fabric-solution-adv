@@ -14,27 +14,9 @@
 # META   }
 # META }
 
-# CELL ********************
-
-# MAGIC %%configure -f
-# MAGIC {
-# MAGIC     "environment": {
-# MAGIC         "id": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_ID)"},
-# MAGIC         "name": {"variableName": "$(/**/vl-av01-variables/ENVIRONMENT_NAME)"}
-# MAGIC     }
-# MAGIC }
-
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
 # MARKDOWN ********************
 
-# ![image-alt-text](image-URL)# nb-av01-unit-tests
+# # nb-av01-unit-tests
 # 
 # **Purpose**: Unit tests for core functions in nb-av01-generic-functions.
 # 

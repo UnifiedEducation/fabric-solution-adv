@@ -23,26 +23,6 @@
       "value": "fs-av01-admin-c6670bd5-7eb3-45cf-ae8c-b07a49e7b8e9"
     },
     {
-      "name": "_0_INGEST_NOTEBOOK_ID",
-      "value": "f3f9d134-2683-4d97-9b0c-6caeb333a3a3"
-    },
-    {
-      "name": "_1_LOAD_NOTEBOOK_ID",
-      "value": "130ee332-10e4-4f86-bce5-808b65d49da9"
-    },
-    {
-      "name": "_2_CLEAN_NOTEBOOK_ID",
-      "value": "d4e0bda6-4849-4ebd-ab2a-f08e048486be"
-    },
-    {
-      "name": "_3_MODEL_NOTEBOOK_ID",
-      "value": "1863cd8b-72ac-4099-82e8-b0c375faa153"
-    },
-    {
-      "name": "_4_VALIDATE_NOTEBOOK_ID",
-      "value": "3b34b88b-f744-427f-8855-d0d8e28e28ad"
-    },
-    {
       "name": "PROCESSING_WORKSPACE_ID",
       "value": "49b67df4-c3ac-4323-9c95-8ec98217ac66"
     },
