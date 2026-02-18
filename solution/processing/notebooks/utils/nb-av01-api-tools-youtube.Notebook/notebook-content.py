@@ -11,14 +11,10 @@
 # MARKDOWN ********************
 
 # # nb-av01-api-tools-youtube
-#
-# **Purpose**: YouTube-specific helper functions for API extraction.
-#
-# **Usage**: `%run nb-av01-api-tools-youtube`
-#
-# **Dependencies**: Requires `requests` and `json` (available via nb-av01-generic-functions)
-#
-# **Functions**:
+# # **Purpose**: YouTube-specific helper functions for API extraction.
+# # **Usage**: `%run nb-av01-api-tools-youtube`
+# # **Dependencies**: Requires `requests` and `json` (available via nb-av01-generic-functions)
+# # **Functions**:
 # - `ingest_youtube()` - Entry-point handler for YouTube API ingestion (called by nb-0 via metadata dispatch)
 # - `extract_video_ids()` - Extract video IDs from playlist items response
 # - `fetch_video_stats_batched()` - Fetch video statistics in batches

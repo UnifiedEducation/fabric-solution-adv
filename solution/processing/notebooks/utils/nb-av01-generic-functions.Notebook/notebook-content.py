@@ -7,17 +7,13 @@
 # META     "name": "synapse_pyspark"
 # META   },
 # META   "dependencies": {
-# META     "environment": {
-# META       "environmentId": "8e42a676-c1b7-8c84-4def-63a50b9c5c90",
-# META       "workspaceId": "00000000-0000-0000-0000-000000000000"
-# META     }
+# META     "environment": {}
 # META   }
 # META }
 
 # MARKDOWN ********************
 
 # # av01 Generic Functions Library
-#
 # Metadata-driven utility functions for the av01 orchestration framework.
 # 
 # **Design Principle**: All function names come from metadata. Python implements the functions; metadata controls which ones get called.
@@ -955,52 +951,75 @@ def build_expectation(gx_method: str, column_name: str = None, validation_params
     return exp_class(**kwargs)
 
 
-def run_validations(context, df, validation_rows: list, expectation_lookup: dict) -> dict:
+def run_table_validations(datasource, df, table_name: str,
+                          table_validations: list, expectation_lookup: dict):
     """
-    Run GX validations based on joined instruction + expectation data.
+    Run GX validations for a single table. Handles expectation building,
+    suite creation, asset/batch management, and validation execution.
 
     Args:
-        context: GX context
+        datasource: GX Spark datasource
         df: DataFrame to validate
-        validation_rows: List of dicts from instructions.validations
-        expectation_lookup: Dict mapping expectation_id -> {gx_method, ...}
-                           (from load_expectation_store)
+        table_name: Table identifier (e.g., 'marketing/channels')
+        table_validations: List of instruction dicts for this table
+        expectation_lookup: Dict mapping expectation_id -> {gx_method, expectation_name, ...}
 
-    Returns: dict with validation results per table
+    Returns: (validation_result, expectations_metadata)
+        validation_result: GX ValidationResult object
+        expectations_metadata: List of dicts with expectation details for logging
     """
-    results = {}
+    # Build expectations from metadata
+    expectations = []
+    for v in table_validations:
+        exp_meta = expectation_lookup.get(v["expectation_id"])
+        if not exp_meta:
+            print(f"  -> WARNING: expectation_id {v['expectation_id']} not found, skipping")
+            continue
 
-    # Group validations by target_table
-    by_table = {}
-    for row in validation_rows:
-        table = row["target_table"]
-        if table not in by_table:
-            by_table[table] = []
-        by_table[table].append(row)
+        params = json.loads(v["validation_params"]) if v.get("validation_params") else {}
+        exp = build_expectation(
+            gx_method=exp_meta["gx_method"],
+            column_name=v.get("column_name"),
+            validation_params=params
+        )
+        expectations.append({
+            "expectation": exp,
+            "severity": v.get("severity", "error"),
+            "column": v.get("column_name"),
+            "expectation_name": exp_meta["expectation_name"],
+            "validation_instr_id": v["validation_instr_id"]
+        })
 
-    for table_name, rows in by_table.items():
-        # Build expectations from metadata
-        expectations = []
-        for row in rows:
-            exp_meta = expectation_lookup.get(row["expectation_id"])
-            if exp_meta:
-                params = json.loads(row["validation_params"]) if row.get("validation_params") else {}
-                exp = build_expectation(
-                    gx_method=exp_meta["gx_method"],
-                    column_name=row.get("column_name"),
-                    validation_params=params
-                )
-                expectations.append(exp)
+    # Create expectation suite
+    safe_name = table_name.replace("/", "_")
+    suite = gx.ExpectationSuite(name=f"{safe_name}_suite")
+    for e in expectations:
+        suite.add_expectation(e["expectation"])
 
-        # Create suite and validate
-        suite = gx.ExpectationSuite(name=f"{table_name.replace('/', '_')}_suite")
-        for exp in expectations:
-            suite.add_expectation(exp)
+    # Get or create dataframe asset and batch definition
+    asset_name = f"{safe_name}_asset"
+    try:
+        asset = datasource.get_asset(asset_name)
+    except LookupError:
+        asset = datasource.add_dataframe_asset(name=asset_name)
 
-        batch = context.get_batch(batch_parameters={"dataframe": df})
-        results[table_name] = batch.validate(suite)
+    batch_def_name = f"batch_def_{safe_name}"
+    try:
+        batch_definition = asset.get_batch_definition(batch_def_name)
+    except LookupError:
+        batch_definition = asset.add_batch_definition_whole_dataframe(name=batch_def_name)
 
-    return results
+    batch = batch_definition.get_batch(batch_parameters={"dataframe": df})
+
+    # Run validation
+    validation_result = batch.validate(suite)
+
+    # Attach metadata for downstream logging
+    validation_result.meta["table_name"] = table_name
+    validation_result.meta["validation_instructions"] = expectations
+
+    return validation_result, expectations
+
 
 # METADATA ********************
 
