@@ -4,8 +4,6 @@ This page covers the key aspects of the Advanced Fabric Data Platform. For full 
 
 ## Architecture
 
-![High-level architecture](development/av-doc-high_level_architecture.png)
-
 The solution uses a 9-workspace layout across 3 areas (Datastores, Processing, Consumption) and 3 environments (DEV, TEST, PROD). Each architecture version has 6 dedicated Fabric Capacities with automated pause/resume to minimise cost. Ephemeral feature workspaces are created via GitHub Actions for isolated development.
 
 | Topic | Training |
@@ -70,4 +68,4 @@ All Fabric items follow the pattern: `[type]-[project]-[stage]-[description]`
 
 Project code: `av01` (Advanced, Architecture Version 01). Environments: `dev`, `test`, `prod`.
 
-See [full naming convention](development/av-doc-naming_convention.md) for details and examples.
+Project code: Examples: `nb-av01-0-ingest-api`, `lh_av01_bronze`, `pp-av01-run`.
