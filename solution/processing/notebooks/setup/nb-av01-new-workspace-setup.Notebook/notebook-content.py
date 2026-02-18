@@ -13,7 +13,7 @@
 
 # # nb-av01-new-workspace-setup
 # 
-# **Purpose**: Initialize a new workspace/environment, after deployment. This includes populating Lakehosues, publishing the Environment, and initializing the Metadata database with metadata. 
+# **Purpose**: Initialize a new workspace/environment, after deployment. This includes populating Lakehouses, publishing the Environment, and initializing the Metadata database with metadata. 
 # 
 # Optional toggles to turn steps on/off. (These are also notebook params, should you wish to parameterize the notebook).
 # 

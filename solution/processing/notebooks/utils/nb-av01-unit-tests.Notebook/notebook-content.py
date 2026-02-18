@@ -34,7 +34,7 @@
 
 # MARKDOWN ********************
 
-# ![image-alt-text](image-URL)# nb-av01-unit-tests
+# # nb-av01-unit-tests
 # 
 # **Purpose**: Unit tests for core functions in nb-av01-generic-functions.
 # 

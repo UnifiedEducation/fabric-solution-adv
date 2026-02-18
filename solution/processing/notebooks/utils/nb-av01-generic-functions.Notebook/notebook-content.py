@@ -16,9 +16,9 @@
 
 # MARKDOWN ********************
 
-# # PRJ106 Generic Functions Library
-# 
-# Metadata-driven utility functions for the PRJ106 orchestration framework.
+# # av01 Generic Functions Library
+#
+# Metadata-driven utility functions for the av01 orchestration framework.
 # 
 # **Design Principle**: All function names come from metadata. Python implements the functions; metadata controls which ones get called.
 # 

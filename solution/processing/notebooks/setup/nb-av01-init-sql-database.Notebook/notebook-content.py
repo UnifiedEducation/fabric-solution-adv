@@ -17,7 +17,7 @@
 # 
 # **Usage**: Run once per new workspace/environment to populate metadata tables.
 # 
-# Uses the Spark - MSSQL Connector, [read more here](). 
+# Uses the Spark - MSSQL Connector, [read more here](https://learn.microsoft.com/en-us/fabric/data-engineering/spark-sql-connector?tabs=pyspark%2Caccesstoken). 
 # 
 # **Dependencies**: Requires nb-av01-generic-functions (provides TimestampType, BooleanType, notebookutils)
 # 
