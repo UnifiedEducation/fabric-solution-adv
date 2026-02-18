@@ -181,7 +181,7 @@ def create_lakehouse_objects(layer_name: str, lakehouse_config: dict):
 for layer_name, lakehouse_config in LAKEHOUSE_METADATA.items():
     create_lakehouse_objects(layer_name, lakehouse_config)
 
-print("\nLakehouse creation complete.")
+print("Lakehouse creation complete.")
 
 # METADATA ********************
 
