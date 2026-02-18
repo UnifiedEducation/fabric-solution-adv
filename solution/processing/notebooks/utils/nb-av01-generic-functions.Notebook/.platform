@@ -3,7 +3,7 @@
   "metadata": {
     "type": "Notebook",
     "displayName": "nb-av01-generic-functions",
-    "description": "New notebook"
+    "description": "Metadata-driven utility functions for the av01 orchestration framework"
   },
   "config": {
     "version": "2.0",

@@ -23,12 +23,13 @@ GO
 -- STEP 2: SEED SOURCE STORE
 -- ============================================================================
 
-INSERT INTO metadata.source_store (source_id, source_name, source_type, auth_method, key_vault_url, secret_name, base_url, description)
+INSERT INTO metadata.source_store (source_id, source_name, source_type, auth_method, key_vault_url, secret_name, base_url, handler_function, description)
 VALUES
 (1, 'youtube_api', 'rest_api', 'api_key',
     'https://av01-akv-restapi-keys.vault.azure.net/',
     'data-v3-api-key',
     'https://www.googleapis.com/youtube/v3',
+    'ingest_youtube',
     'YouTube Data API v3 - Channel stats, videos, playlists');
 GO
 
@@ -108,17 +109,17 @@ GO
 -- ============================================================================
 -- From nb-int-0-ingest-youtube.ipynb METADATA dict
 
-INSERT INTO instructions.ingestion (ingestion_id, source_id, endpoint_path, landing_path, request_params, is_active, log_function_id)
+INSERT INTO instructions.ingestion (ingestion_id, source_id, endpoint_path, landing_path, request_params, is_active, log_function_id, pipeline_name, notebook_name)
 VALUES
 (1, 1, '/channels', 'youtube_data_v3/channels/',
     '{"part": "snippet,statistics,contentDetails", "id": "UCrvoIYkzS-RvCEb0x7wfmwQ"}',
-    1, 1),
+    1, 1, 'data_pipeline', 'nb-av01-0-ingest-api'),
 (2, 1, '/playlistItems', 'youtube_data_v3/playlistItems/',
     '{"part": "snippet", "maxResults": 50, "playlistId": "UUrvoIYkzS-RvCEb0x7wfmwQ"}',
-    1, 1),
+    1, 1, 'data_pipeline', 'nb-av01-0-ingest-api'),
 (3, 1, '/videos', 'youtube_data_v3/videos/',
     '{"part": "statistics", "maxResults": 50}',
-    1, 1);
+    1, 1, 'data_pipeline', 'nb-av01-0-ingest-api');
 GO
 
 -- ============================================================================
@@ -126,28 +127,28 @@ GO
 -- ============================================================================
 -- From nb-int-1-load-youtube.ipynb
 
-INSERT INTO instructions.loading (loading_instr_id, loading_id, source_path, source_layer, target_table, target_layer, key_columns, load_params, merge_condition, merge_type, merge_columns, is_active, log_function_id)
+INSERT INTO instructions.loading (loading_instr_id, loading_id, source_path, source_layer, target_table, target_layer, key_columns, load_params, merge_condition, merge_type, merge_columns, is_active, log_function_id, pipeline_name, notebook_name)
 VALUES
 -- Channel: merge on channel_id + date
 (1, 1, 'Files/youtube_data_v3/channels/', 'raw', 'youtube/channel', 'bronze',
     '["channel_id"]',
     '{"column_mapping_id": "youtube_channels"}',
     'target.channel_id = source.channel_id AND to_date(target.loading_TS) = to_date(source.loading_TS)',
-    'update_all', NULL, 1, 1),
+    'update_all', NULL, 1, 1, 'data_pipeline', 'nb-av01-1-load'),
 
 -- Playlist Items: merge on video_id only
 (2, 1, 'Files/youtube_data_v3/playlistItems/', 'raw', 'youtube/playlist_items', 'bronze',
     '["video_id"]',
     '{"column_mapping_id": "youtube_playlist_items"}',
     'target.video_id = source.video_id',
-    'update_all', NULL, 1, 1),
+    'update_all', NULL, 1, 1, 'data_pipeline', 'nb-av01-1-load'),
 
 -- Videos: merge on video_id only
 (3, 1, 'Files/youtube_data_v3/videos/', 'raw', 'youtube/videos', 'bronze',
     '["video_id"]',
     '{"column_mapping_id": "youtube_videos"}',
     'target.video_id = source.video_id',
-    'update_all', NULL, 1, 1);
+    'update_all', NULL, 1, 1, 'data_pipeline', 'nb-av01-1-load');
 GO
 
 -- ============================================================================
@@ -155,28 +156,28 @@ GO
 -- ============================================================================
 -- From nb-int-2-clean-youtube.ipynb
 
-INSERT INTO instructions.transformations (transform_instr_id, source_table, source_layer, dest_table, dest_layer, transform_pipeline, transform_params, merge_condition, merge_type, merge_columns, is_active, log_function_id)
+INSERT INTO instructions.transformations (transform_instr_id, source_table, source_layer, dest_table, dest_layer, transform_pipeline, transform_params, merge_condition, merge_type, merge_columns, is_active, log_function_id, pipeline_name, notebook_name)
 VALUES
 -- Channel: filter nulls on channel_id, dedupe by channel_id+date
 (1, 'youtube/channel', 'bronze', 'youtube/channel_stats', 'silver',
     '[1, 2]',
     '{"1": {"columns": ["channel_id"]}, "2": {"partition_cols": ["channel_id", "to_date(loading_TS)"], "order_col": "loading_TS", "order_desc": true}}',
     'target.channel_id = source.channel_id AND to_date(target.loading_TS) = to_date(source.loading_TS)',
-    'update_all', NULL, 1, 1),
+    'update_all', NULL, 1, 1, 'data_pipeline', 'nb-av01-2-clean'),
 
 -- Playlist Items -> Videos: filter nulls on video_id+video_title, dedupe by video_id
 (2, 'youtube/playlist_items', 'bronze', 'youtube/videos', 'silver',
     '[1, 2]',
     '{"1": {"columns": ["video_id", "video_title"]}, "2": {"partition_cols": ["video_id"], "order_col": "loading_TS", "order_desc": true}}',
     'target.video_id = source.video_id',
-    'update_all', NULL, 1, 1),
+    'update_all', NULL, 1, 1, 'data_pipeline', 'nb-av01-2-clean'),
 
 -- Videos -> Video Statistics: filter nulls on video_id, dedupe by video_id+date
 (3, 'youtube/videos', 'bronze', 'youtube/video_statistics', 'silver',
     '[1, 2]',
     '{"1": {"columns": ["video_id"]}, "2": {"partition_cols": ["video_id", "to_date(loading_TS)"], "order_col": "loading_TS", "order_desc": true}}',
     'target.video_id = source.video_id',
-    'update_all', NULL, 1, 1);
+    'update_all', NULL, 1, 1, 'data_pipeline', 'nb-av01-2-clean');
 GO
 
 -- ============================================================================
@@ -184,14 +185,14 @@ GO
 -- ============================================================================
 -- From nb-int-3-model-youtube.ipynb
 
-INSERT INTO instructions.transformations (transform_instr_id, source_table, source_layer, dest_table, dest_layer, transform_pipeline, transform_params, merge_condition, merge_type, merge_columns, is_active, log_function_id)
+INSERT INTO instructions.transformations (transform_instr_id, source_table, source_layer, dest_table, dest_layer, transform_pipeline, transform_params, merge_condition, merge_type, merge_columns, is_active, log_function_id, pipeline_name, notebook_name)
 VALUES
 -- Channel Stats -> Marketing Channels: add literals, rename columns
 (10, 'youtube/channel_stats', 'silver', 'marketing/channels', 'gold',
     '[4, 3]',
     '{"4": {"columns": {"channel_surrogate_id": 1, "channel_platform": "youtube"}}, "3": {"column_mapping": {"channel_name": "channel_account_name", "channel_description": "channel_account_description", "subscriber_count": "channel_total_subscribers", "video_count": "channel_total_assets", "view_count": "channel_total_views", "loading_TS": "modified_TS"}}}',
     'target.channel_surrogate_id = source.channel_surrogate_id AND to_date(target.modified_TS) = to_date(source.modified_TS)',
-    'update_all', NULL, 1, 1),
+    'update_all', NULL, 1, 1, 'data_pipeline', 'nb-av01-3-model'),
 
 -- Videos -> Marketing Assets: add literals, rename columns, generate surrogate key
 (11, 'youtube/videos', 'silver', 'marketing/assets', 'gold',
@@ -200,7 +201,7 @@ VALUES
     'target.asset_natural_id = source.asset_natural_id',
     'specific_columns',
     '{"update": ["asset_title", "asset_text", "asset_publish_date", "modified_TS"], "insert": ["asset_surrogate_id", "asset_natural_id", "channel_surrogate_id", "asset_title", "asset_text", "asset_publish_date", "modified_TS"]}',
-    1, 1),
+    1, 1, 'data_pipeline', 'nb-av01-3-model'),
 
 -- Video Statistics -> Marketing Asset Stats: lookup join, rename columns
 (12, 'youtube/video_statistics', 'silver', 'marketing/asset_stats', 'gold',
@@ -209,7 +210,7 @@ VALUES
     'target.asset_surrogate_id = source.asset_surrogate_id AND to_date(target.modified_TS) = to_date(source.modified_TS)',
     'specific_columns',
     '{"update": ["asset_total_views", "asset_total_impressions", "asset_total_likes", "asset_total_comments", "modified_TS"], "insert": ["asset_surrogate_id", "asset_total_views", "asset_total_impressions", "asset_total_likes", "asset_total_comments", "modified_TS"]}',
-    1, 1);
+    1, 1, 'data_pipeline', 'nb-av01-3-model');
 GO
 
 -- ============================================================================
@@ -218,20 +219,20 @@ GO
 -- From nb-int-4-validate-youtube.ipynb VALIDATION_METADATA
 -- Validations run on Gold layer: marketing/channels, marketing/assets, marketing/asset_stats
 
-INSERT INTO instructions.validations (validation_instr_id, target_table, target_layer, expectation_id, column_name, validation_params, severity, is_active, log_function_id)
+INSERT INTO instructions.validations (validation_instr_id, target_table, target_layer, expectation_id, column_name, validation_params, severity, is_active, log_function_id, pipeline_name, notebook_name)
 VALUES
 -- marketing/channels validations (from nb_int_setup_gx.ipynb)
-(1, 'marketing/channels', 'gold', 3, 'channel_surrogate_id', '{"value_set": [1]}', 'error', 1, 2),
-(2, 'marketing/channels', 'gold', 4, 'channel_total_views', NULL, 'error', 1, 2),
+(1, 'marketing/channels', 'gold', 3, 'channel_surrogate_id', '{"value_set": [1]}', 'error', 1, 2, 'data_pipeline', 'nb-av01-4-validate'),
+(2, 'marketing/channels', 'gold', 4, 'channel_total_views', NULL, 'error', 1, 2, 'data_pipeline', 'nb-av01-4-validate'),
 
 -- marketing/assets validations (from nb_int_setup_gx.ipynb)
-(3, 'marketing/assets', 'gold', 2, 'asset_surrogate_id', NULL, 'error', 1, 2),
-(4, 'marketing/assets', 'gold', 1, 'asset_natural_id', NULL, 'error', 1, 2),
-(5, 'marketing/assets', 'gold', 1, 'asset_publish_date', NULL, 'error', 1, 2),
-(6, 'marketing/assets', 'gold', 5, NULL, '{"column_list": ["asset_title", "asset_surrogate_id"]}', 'error', 1, 2),
+(3, 'marketing/assets', 'gold', 2, 'asset_surrogate_id', NULL, 'error', 1, 2, 'data_pipeline', 'nb-av01-4-validate'),
+(4, 'marketing/assets', 'gold', 1, 'asset_natural_id', NULL, 'error', 1, 2, 'data_pipeline', 'nb-av01-4-validate'),
+(5, 'marketing/assets', 'gold', 1, 'asset_publish_date', NULL, 'error', 1, 2, 'data_pipeline', 'nb-av01-4-validate'),
+(6, 'marketing/assets', 'gold', 5, NULL, '{"column_list": ["asset_title", "asset_surrogate_id"]}', 'error', 1, 2, 'data_pipeline', 'nb-av01-4-validate'),
 
 -- marketing/asset_stats validations (from nb_int_setup_gx.ipynb)
-(7, 'marketing/asset_stats', 'gold', 6, 'asset_total_impressions', NULL, 'error', 1, 2);
+(7, 'marketing/asset_stats', 'gold', 6, 'asset_total_impressions', NULL, 'error', 1, 2, 'data_pipeline', 'nb-av01-4-validate');
 GO
 
 -- ============================================================================
