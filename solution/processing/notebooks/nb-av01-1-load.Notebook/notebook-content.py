@@ -7,23 +7,19 @@
 # META     "name": "synapse_pyspark"
 # META   },
 # META   "dependencies": {
-# META     "environment": {
-# META       "environmentId": "8e42a676-c1b7-8c84-4def-63a50b9c5c90",
-# META       "workspaceId": "00000000-0000-0000-0000-000000000000"
-# META     }
+# META     "environment": {}
 # META   }
 # META }
 
 # MARKDOWN ********************
 
 # # nb-av01-1-load
-#
 # **Purpose**: Load raw JSON files into Bronze Delta tables using column mappings.
-#
+# 
 # **Stage**: Raw (Files) → Bronze (Delta tables)
-#
+# 
 # **Dependencies**: nb-av01-generic-functions
-#
+# 
 # **Metadata**: instructions.loading, metadata.loading_store, metadata.column_mappings
 
 # MARKDOWN ********************
@@ -93,7 +89,6 @@ loading_instructions = get_active_instructions(spark, "loading", layer="bronze")
 # MARKDOWN ********************
 
 # ## Execute Loading
-#
 # Expected fields in each instruction from `instructions.loading`:
 # - `loading_id` (int, required): Lookup key in metadata.loading_store
 # - `source_path` (str, required): Path to raw JSON files in landing zone

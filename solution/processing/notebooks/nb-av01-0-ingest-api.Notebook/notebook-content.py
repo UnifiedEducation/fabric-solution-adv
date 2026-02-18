@@ -7,26 +7,36 @@
 # META     "name": "synapse_pyspark"
 # META   },
 # META   "dependencies": {
-# META     "environment": {
-# META       "environmentId": "8e42a676-c1b7-8c84-4def-63a50b9c5c90",
-# META       "workspaceId": "00000000-0000-0000-0000-000000000000"
-# META     }
+# META     "environment": {}
 # META   }
 # META }
 
 # MARKDOWN ********************
 
 # # nb-av01-0-ingest-api
-#
 # **Purpose**: Ingest data from external REST APIs to the Raw landing zone.
-#
+# 
 # **Stage**: External APIs → Raw (Files in Bronze Lakehouse)
-#
+# 
 # **Dependencies**: nb-av01-generic-functions, nb-av01-api-tools-youtube
 
 # MARKDOWN ********************
 
 # ## Imports & Setup
+
+# PARAMETERS CELL ********************
+
+# Parameters - passed via REST API execution
+spn_tenant_id = ""
+spn_client_id = ""
+spn_client_secret = ""
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
 
 # CELL ********************
 
@@ -53,20 +63,6 @@
 # MARKDOWN ********************
 
 # ## Configuration
-
-# PARAMETERS CELL ********************
-
-# Parameters - passed via REST API execution
-spn_tenant_id = ""
-spn_client_id = ""
-spn_client_secret = ""
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
 
 # CELL ********************
 
@@ -116,10 +112,32 @@ ingestion_instructions = get_active_instructions(spark, "ingestion")
 # META   "language_group": "synapse_pyspark"
 # META }
 
+# CELL ********************
+
+df = spark.read.option("url", METADATA_DB_URL).mssql("metadata.source_store")
+df.printSchema()                                                               
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+  print(source_lookup)
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
 # MARKDOWN ********************
 
 # ## Execute Ingestion
-#
 # Expected fields in each instruction from `instructions.ingestion`:
 # - `source_id` (int, required): Lookup key in metadata.source_store
 # - `endpoint_path` (str, required): API endpoint path (e.g., '/channels')
@@ -128,7 +146,6 @@ ingestion_instructions = get_active_instructions(spark, "ingestion")
 # - `log_function_id` (int, required): Lookup key in metadata.log_store
 # - `pipeline_name` (str, optional): Pipeline name for logging
 # - `notebook_name` (str, optional): Notebook name for logging
-#
 # Expected fields in `metadata.source_store`:
 # - `source_name` (str): Human-readable source name
 # - `base_url` (str): API base URL

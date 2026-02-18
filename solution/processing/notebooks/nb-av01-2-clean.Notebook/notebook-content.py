@@ -7,23 +7,19 @@
 # META     "name": "synapse_pyspark"
 # META   },
 # META   "dependencies": {
-# META     "environment": {
-# META       "environmentId": "8e42a676-c1b7-8c84-4def-63a50b9c5c90",
-# META       "workspaceId": "00000000-0000-0000-0000-000000000000"
-# META     }
+# META     "environment": {}
 # META   }
 # META }
 
 # MARKDOWN ********************
 
 # # nb-av01-2-clean
-#
 # **Purpose**: Transform Bronze data to Silver using metadata-driven cleansing rules.
-#
+# 
 # **Stage**: Bronze → Silver
-#
+# 
 # **Dependencies**: nb-av01-generic-functions
-#
+# 
 # **Metadata**: instructions.transformations (dest_layer='silver'), metadata.transform_store
 
 # MARKDOWN ********************
@@ -93,7 +89,6 @@ transform_instructions = get_active_instructions(spark, "transformations", layer
 # MARKDOWN ********************
 
 # ## Execute Transformations
-#
 # Expected fields in each instruction from `instructions.transformations`:
 # - `source_table` (str, required): Delta table name in Bronze (e.g., 'youtube/channels')
 # - `dest_table` (str, required): Delta table name in Silver
