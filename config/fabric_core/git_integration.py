@@ -104,7 +104,9 @@ def update_workspace_from_git(workspace_id, workspace_name):
             print(f"     Error: {error_text}")
             return False
 
-        remote_commit_hash = status_json.get('text', {}).get('remoteCommitHash')
+        git_status = status_json.get('text', {})
+        remote_commit_hash = git_status.get('remoteCommitHash')
+        workspace_head = git_status.get('workspaceHead')
         if not remote_commit_hash:
             print(f"  Warning: No remoteCommitHash found in status")
             return False
@@ -112,9 +114,10 @@ def update_workspace_from_git(workspace_id, workspace_name):
         print(f"  Warning: Failed to parse Git status")
         return False
 
-    # Update from Git using the remoteCommitHash
+    # Update from Git using the remoteCommitHash and workspaceHead
     update_request = {
         "remoteCommitHash": remote_commit_hash,
+        "workspaceHead": workspace_head,
         "conflictResolution": {
             "conflictResolutionType": "Workspace",
             "conflictResolutionPolicy": "PreferWorkspace"
@@ -133,14 +136,17 @@ def update_workspace_from_git(workspace_id, workspace_name):
 
     try:
         response_json = json.loads(update_response.stdout)
-        if response_json.get('status_code') in [200, 201, 202]:
+        status_code = response_json.get('status_code')
+        if status_code in [200, 201, 202]:
             print(f"   Updated {workspace_name} from Git")
             return True
+        print(f"  Warning: Update from Git failed (HTTP {status_code})")
+        print(f"     Response: {response_json.get('text', {})}")
+        return False
     except json.JSONDecodeError:
-        pass
-
-    print(f"  Warning: Update from Git may have failed")
-    return False
+        print(f"  Warning: Update from Git returned invalid response")
+        print(f"     stdout: {update_response.stdout[:500]}")
+        return False
 
 
 def connect_workspace_to_git(workspace_id, workspace_name, directory_name, git_config, connection_id):
