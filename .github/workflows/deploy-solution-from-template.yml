@@ -7,7 +7,7 @@ on:
         description: "Path to configuration template file"
         required: false
         type: string
-        default: "config/v01/v01-template.yml"
+        default: "config/templates/v01/v01-template.yml"
 
 env:
   PYTHON_VERSION: '3.12'

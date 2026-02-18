@@ -11,9 +11,9 @@
 
 # MARKDOWN ********************
 
-# ## Publish Environment
+# # nb-av01-publish-environment
 # 
-# When using Git branch-out or deployment, environments become unpublished when you deploy to a new Workspaace (like Test/ Prod). 
+# When using Git branch-out or deployment, environments become unpublished when you deploy to a new Workspace (like Test/ Prod). 
 # 
 # This script:
 # - gets variables from the variable library 

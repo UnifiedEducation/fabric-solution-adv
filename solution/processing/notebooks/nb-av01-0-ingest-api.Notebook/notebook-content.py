@@ -17,11 +17,11 @@
 # MARKDOWN ********************
 
 # # nb-av01-0-ingest-api
-# 
+#
 # **Purpose**: Ingest data from external REST APIs to the Raw landing zone.
-# 
+#
 # **Stage**: External APIs → Raw (Files in Bronze Lakehouse)
-# 
+#
 # **Dependencies**: nb-av01-generic-functions, nb-av01-api-tools-youtube
 
 # MARKDOWN ********************
@@ -76,7 +76,6 @@ if spn_tenant_id and spn_client_id and spn_client_secret:
     set_spn_credentials(spn_tenant_id, spn_client_id, spn_client_secret)
 
 # Load workspace-specific variables from Variable Library
-# Provides: LH_WORKSPACE_NAME, BRONZE_LH_NAME, SILVER_LH_NAME, GOLD_LH_NAME, METADATA_SERVER, METADATA_DB
 variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
 
 # Build base path for raw files landing zone (Files area of Bronze LH)
@@ -101,7 +100,7 @@ set_metadata_db_url(
     database=variables.METADATA_DB
 )
 
-# Load source store for API connection details
+# Load source store for API connection details (source_id -> base_url, key_vault_url, handler_function, etc.)
 source_lookup = load_source_store(spark)
 
 # Load log store for logging function lookup
@@ -121,65 +120,62 @@ ingestion_instructions = get_active_instructions(spark, "ingestion")
 # MARKDOWN ********************
 
 # ## Execute Ingestion
+#
+# Expected fields in each instruction from `instructions.ingestion`:
+# - `source_id` (int, required): Lookup key in metadata.source_store
+# - `endpoint_path` (str, required): API endpoint path (e.g., '/channels')
+# - `request_params` (JSON str, optional): Query parameters for the API call
+# - `landing_path` (str, required): Subfolder in Raw landing zone
+# - `log_function_id` (int, required): Lookup key in metadata.log_store
+# - `pipeline_name` (str, optional): Pipeline name for logging
+# - `notebook_name` (str, optional): Notebook name for logging
+#
+# Expected fields in `metadata.source_store`:
+# - `source_name` (str): Human-readable source name
+# - `base_url` (str): API base URL
+# - `key_vault_url` (str): Azure Key Vault URL
+# - `secret_name` (str): Secret name in Key Vault
+# - `handler_function` (str): Ingestion handler function name (e.g., 'ingest_youtube')
 
 # CELL ********************
 
-NOTEBOOK_NAME = "nb-av01-0-ingest-api"
-PIPELINE_NAME = "youtube_pipeline"  # Or get from pipeline parameter
+# Read pipeline/notebook identity from instruction metadata
+first_instr = ingestion_instructions[0] if ingestion_instructions else {}
+PIPELINE_NAME = first_instr.get("pipeline_name", "data_pipeline")
+NOTEBOOK_NAME = first_instr.get("notebook_name", "nb-av01-0-ingest-api")
 
-# Store responses for dependency resolution between endpoints
-ingestion_responses = {}
+# Shared context for cross-instruction dependencies
+# (e.g., /videos endpoint needs data from /playlistItems endpoint)
+ingestion_context = {}
 
 for instr in ingestion_instructions:
-    # Capture start time for accurate duration tracking
     start_time = datetime.now()
     source_meta = None
 
     try:
-        # Get source metadata
+        # Resolve source metadata
         source_meta = source_lookup.get(instr["source_id"])
         if not source_meta:
-            raise ValueError(f"Source ID {instr['source_id']} not found")
-
-        # Parse request params from JSON
-        request_params = json.loads(instr["request_params"]) if instr.get("request_params") else {}
+            raise ValueError(f"Source ID {instr['source_id']} not found in source_store")
 
         print(f"Ingesting: {source_meta['source_name']}{instr['endpoint_path']}")
 
-        # Get API key
+        # Get API key from Key Vault
         api_key = get_api_key_from_keyvault(
             source_meta["key_vault_url"],
             source_meta["secret_name"]
         )
-        base_url = source_meta["base_url"].rstrip("/")
 
-        # Execute ingestion based on endpoint type
-        if instr["endpoint_path"] == "/videos":
-            # Videos endpoint needs video IDs from playlistItems response
-            playlist_items = ingestion_responses.get("/playlistItems", [])
-            if not playlist_items:
-                raise ValueError("No playlistItems response found - must run playlistItems first")
+        # Dispatch to handler function defined in source metadata
+        handler_name = source_meta.get("handler_function")
+        if not handler_name:
+            raise ValueError(f"No handler_function defined for source '{source_meta['source_name']}'")
 
-            video_ids = extract_video_ids(playlist_items)
-            print(f"  -> Extracted {len(video_ids)} video IDs from playlistItems")
+        handler_func = globals().get(handler_name)
+        if not handler_func:
+            raise ValueError(f"Handler function '{handler_name}' not found")
 
-            items = fetch_video_stats_batched(base_url, api_key, video_ids)
-
-        elif instr["endpoint_path"] == "/playlistItems":
-            # Paginated endpoint - use pagination helper
-            url = f"{base_url}{instr['endpoint_path']}"
-            items = fetch_with_pagination(url, request_params, api_key)
-            # Store response for downstream dependencies
-            ingestion_responses[instr["endpoint_path"]] = items
-
-        else:
-            # Standard single-call endpoint (channels, etc.)
-            url = f"{base_url}{instr['endpoint_path']}"
-            request_params["key"] = api_key
-            response = requests.get(url, params=request_params)
-            response.raise_for_status()
-            data = response.json()
-            items = data.get("items", [data])
+        items = handler_func(source_meta, instr, api_key, ingestion_context)
 
         # Save to landing zone
         item_count = len(items)
@@ -187,13 +183,14 @@ for instr in ingestion_instructions:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         file_path = f"{output_path}{timestamp}.json"
 
+        # Wrap multiple items in {"items": [...]} for consistent downstream parsing
         output_data = {"items": items} if item_count > 1 else (items[0] if items else {})
         json_content = json.dumps(output_data, indent=2)
         notebookutils.fs.put(file_path, json_content, overwrite=True)
 
         print(f"  -> Saved {item_count} items to {instr['landing_path']}")
 
-        # Log success using metadata-driven function lookup
+        # Log success
         log_meta = log_lookup.get(instr["log_function_id"])
         if log_meta:
             log_func = globals().get(log_meta["function_name"])
@@ -209,12 +206,16 @@ for instr in ingestion_instructions:
                     instruction_detail=instr["endpoint_path"],
                     started_at=start_time
                 )
+            else:
+                print(f"  -> WARNING: Log function '{log_meta['function_name']}' not found")
+        else:
+            print(f"  -> WARNING: log_function_id '{instr['log_function_id']}' not found in log_store")
 
     except Exception as e:
         print(f"  -> ERROR: {str(e)}")
 
-        # Log failure using metadata-driven function lookup
-        log_meta = log_lookup.get(instr["log_function_id"])
+        # Log failure
+        log_meta = log_lookup.get(instr.get("log_function_id"))
         if log_meta:
             log_func = globals().get(log_meta["function_name"])
             if log_func:
@@ -227,9 +228,13 @@ for instr in ingestion_instructions:
                     error_message=str(e),
                     action_type=ACTION_INGESTION,
                     source_name=source_meta["source_name"] if source_meta else None,
-                    instruction_detail=instr["endpoint_path"],
+                    instruction_detail=instr.get("endpoint_path"),
                     started_at=start_time
                 )
+            else:
+                print(f"  -> WARNING: Could not log failure - log function not found")
+        else:
+            print(f"  -> WARNING: Could not log failure - log_function_id not found")
         raise
 
 # METADATA ********************

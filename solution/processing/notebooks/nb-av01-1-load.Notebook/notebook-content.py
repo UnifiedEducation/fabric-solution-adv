@@ -17,13 +17,13 @@
 # MARKDOWN ********************
 
 # # nb-av01-1-load
-# 
+#
 # **Purpose**: Load raw JSON files into Bronze Delta tables using column mappings.
-# 
+#
 # **Stage**: Raw (Files) → Bronze (Delta tables)
-# 
+#
 # **Dependencies**: nb-av01-generic-functions
-# 
+#
 # **Metadata**: instructions.loading, metadata.loading_store, metadata.column_mappings
 
 # MARKDOWN ********************
@@ -48,7 +48,6 @@
 # CELL ********************
 
 # Load workspace-specific variables from Variable Library
-# Provides: LH_WORKSPACE_NAME, BRONZE_LH_NAME, SILVER_LH_NAME, GOLD_LH_NAME, METADATA_SERVER, METADATA_DB
 variables = notebookutils.variableLibrary.getLibrary("vl-av01-variables")
 
 # Build base paths
@@ -74,7 +73,7 @@ set_metadata_db_url(
     database=variables.METADATA_DB
 )
 
-# Load loading store for function lookup
+# Load loading store for function lookup (loading_id -> function_name)
 loading_lookup = load_loading_store(spark)
 
 # Load log store for logging
@@ -94,89 +93,75 @@ loading_instructions = get_active_instructions(spark, "loading", layer="bronze")
 # MARKDOWN ********************
 
 # ## Execute Loading
+#
+# Expected fields in each instruction from `instructions.loading`:
+# - `loading_id` (int, required): Lookup key in metadata.loading_store
+# - `source_path` (str, required): Path to raw JSON files in landing zone
+# - `target_table` (str, required): Delta table name in Bronze (e.g., 'youtube/channels')
+# - `merge_condition` (str, required): SQL MERGE condition (e.g., 'target.id = source.id')
+# - `merge_type` (str, required): 'update_all' or 'specific_columns'
+# - `merge_columns` (JSON str, optional): Column lists for specific_columns merge
+# - `load_params` (JSON str, optional): Additional parameters (e.g., column_mapping_id)
+# - `log_function_id` (int, required): Lookup key in metadata.log_store
+# - `pipeline_name` (str, optional): Pipeline name for logging
+# - `notebook_name` (str, optional): Notebook name for logging
 
 # CELL ********************
 
-NOTEBOOK_NAME = "nb-av01-1-load"
-PIPELINE_NAME = "data_pipeline"
+# Read pipeline/notebook identity from instruction metadata
+first_instr = loading_instructions[0] if loading_instructions else {}
+PIPELINE_NAME = first_instr.get("pipeline_name", "data_pipeline")
+NOTEBOOK_NAME = first_instr.get("notebook_name", "nb-av01-1-load")
 
-for instr in loading_instructions:
-    # Capture start time for accurate duration tracking
-    start_time = datetime.now()
 
-    try:
-        # Get loading function metadata
-        loading_meta = loading_lookup.get(instr["loading_id"])
-        if not loading_meta:
-            raise ValueError(f"Loading ID {instr['loading_id']} not found")
+def load_executor(spark, instr):
+    """Execute a single loading instruction. Returns (row_count, source_name, detail)."""
+    # Resolve loading function from metadata
+    loading_meta = loading_lookup.get(instr["loading_id"])
+    if not loading_meta:
+        raise ValueError(f"Loading ID {instr['loading_id']} not found in loading_store")
 
-        # Get the loading function by name from metadata
-        function_name = loading_meta["function_name"]
-        loading_func = globals().get(function_name)
-        if not loading_func:
-            raise ValueError(f"Loading function '{function_name}' not implemented")
+    function_name = loading_meta["function_name"]
+    loading_func = globals().get(function_name)
+    if not loading_func:
+        raise ValueError(f"Loading function '{function_name}' not found")
 
-        # Build paths
-        source_path = f"{RAW_BASE_PATH}{instr['source_path'].replace('Files/', '')}"
-        target_path = f"{BRONZE_BASE_PATH}{instr['target_table']}"
+    # Build paths (build_source_path normalizes any 'Files/' prefix in metadata)
+    source_path = build_source_path(RAW_BASE_PATH, instr["source_path"])
+    target_path = f"{BRONZE_BASE_PATH}{instr['target_table']}"
 
-        # Parse load params
-        load_params = json.loads(instr["load_params"]) if instr.get("load_params") else {}
-        merge_columns = json.loads(instr["merge_columns"]) if instr.get("merge_columns") else None
+    # Parse optional JSON fields
+    load_params = json.loads(instr["load_params"]) if instr.get("load_params") else {}
+    merge_columns = json.loads(instr["merge_columns"]) if instr.get("merge_columns") else None
 
-        print(f"Loading: {instr['source_path']} -> {instr['target_table']}")
+    if not instr.get("merge_type"):
+        raise ValueError(f"merge_type is required in loading instruction for {instr['target_table']}")
 
-        # Execute loading function
-        row_count = loading_func(
-            spark=spark,
-            source_path=source_path,
-            target_path=target_path,
-            column_mapping_id=load_params.get("column_mapping_id"),
-            merge_condition=instr["merge_condition"],
-            merge_type=instr.get("merge_type", "update_all"),
-            merge_columns=merge_columns
-        )
+    print(f"Loading: {instr['source_path']} -> {instr['target_table']}")
 
-        print(f"  -> Loaded {row_count} rows")
+    row_count = loading_func(
+        spark=spark,
+        source_path=source_path,
+        target_path=target_path,
+        column_mapping_id=load_params.get("column_mapping_id"),
+        merge_condition=instr["merge_condition"],
+        merge_type=instr["merge_type"],
+        merge_columns=merge_columns
+    )
 
-        # Log success using metadata-driven function lookup
-        log_meta = log_lookup.get(instr["log_function_id"])
-        if log_meta:
-            log_func = globals().get(log_meta["function_name"])
-            if log_func:
-                log_func(
-                    spark=spark,
-                    pipeline_name=PIPELINE_NAME,
-                    notebook_name=NOTEBOOK_NAME,
-                    status=STATUS_SUCCESS,
-                    rows_processed=row_count,
-                    action_type=ACTION_LOADING,
-                    source_name=instr["source_path"],
-                    instruction_detail=instr["target_table"],
-                    started_at=start_time
-                )
+    print(f"  -> Loaded {row_count} rows")
+    return (row_count, instr["source_path"], instr["target_table"])
 
-    except Exception as e:
-        print(f"  -> ERROR: {str(e)}")
 
-        # Log failure using metadata-driven function lookup
-        log_meta = log_lookup.get(instr["log_function_id"])
-        if log_meta:
-            log_func = globals().get(log_meta["function_name"])
-            if log_func:
-                log_func(
-                    spark=spark,
-                    pipeline_name=PIPELINE_NAME,
-                    notebook_name=NOTEBOOK_NAME,
-                    status=STATUS_FAILED,
-                    rows_processed=0,
-                    error_message=str(e),
-                    action_type=ACTION_LOADING,
-                    source_name=instr["source_path"],
-                    instruction_detail=instr["target_table"],
-                    started_at=start_time
-                )
-        raise
+execute_pipeline_stage(
+    spark=spark,
+    instructions=loading_instructions,
+    stage_executor=load_executor,
+    notebook_name=NOTEBOOK_NAME,
+    pipeline_name=PIPELINE_NAME,
+    action_type=ACTION_LOADING,
+    log_lookup=log_lookup
+)
 
 # METADATA ********************
 
