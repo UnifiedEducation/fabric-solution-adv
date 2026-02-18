@@ -11,13 +11,8 @@ import os
 import sys
 import argparse
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Add config directory to Python path for fabric_core imports
-config_dir = Path(__file__).parent.parent
-if str(config_dir) not in sys.path:
-    sys.path.insert(0, str(config_dir))
-
+from fabric_core import bootstrap
 from fabric_core.utils import load_config
 
 try:
@@ -144,11 +139,7 @@ def main():
     if not args.workspace_type and not args.all_workspaces:
         parser.error("Either --workspace-type or --all-workspaces is required")
 
-    # Load .env for local testing
-    if not os.getenv('GITHUB_ACTIONS'):
-        env_file = Path(__file__).parent.parent.parent / '.env'
-        if env_file.exists():
-            load_dotenv(env_file)
+    bootstrap()
 
     repository_root = Path(__file__).parent.parent.parent
     config_path = repository_root / args.config

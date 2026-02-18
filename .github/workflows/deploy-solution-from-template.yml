@@ -34,7 +34,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: pip install -r config/requirements.txt
+        run: pip install -r config/requirements.txt && pip install -e config/
 
       - name: Run solution generator
-        run: python config/generate_solution_from_yml_simple.py
+        run: python config/scripts/generate_solution_from_yml_simple.py

@@ -45,7 +45,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: pip install -r config/requirements.txt
+        run: pip install -r config/requirements.txt && pip install -e config/
 
       - name: Resume TEST capacities
         run: |

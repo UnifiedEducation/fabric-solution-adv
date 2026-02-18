@@ -6,29 +6,15 @@ It updates the dev workspaces (av01-dev-processing, av01-dev-datastores, etc.)
 with the latest content from the main branch.
 """
 
-# fmt: off
-# isort: skip_file
 import os
 import sys
-from pathlib import Path
-from dotenv import load_dotenv
 
-# Add config directory to Python path to find fabric_core module
-config_dir = Path(__file__).parent.parent
-if str(config_dir) not in sys.path:
-    sys.path.insert(0, str(config_dir))
-
-# Import from fabric_core modules (must be after sys.path modification)
-from fabric_core import auth, get_workspace_id, update_workspace_from_git
+from fabric_core import auth, get_workspace_id, update_workspace_from_git, bootstrap
 from fabric_core.utils import load_config
-# fmt: on
 
 
 def main():
-    # Load environment variables if not in GitHub Actions
-    if not os.getenv('GITHUB_ACTIONS'):
-        # Load .env from project root (2 levels up from scripts/)
-        load_dotenv(Path(__file__).parent.parent.parent / '.env')
+    bootstrap()
 
     # Load config to get solution version and workspace configuration
     config = load_config(
@@ -50,12 +36,13 @@ def main():
     print("=== AUTHENTICATING ===")
     if not auth():
         print("\nERROR: Authentication failed. Cannot proceed with workspace sync.")
-        return
+        sys.exit(1)
 
     print(f"\n=== SYNCING DEV WORKSPACES FROM MAIN ===")
     print(f"Solution version: {solution_version}")
     print(f"Workspaces to sync: {len(dev_workspaces)}\n")
 
+    failures = 0
     for workspace_config in dev_workspaces:
         workspace_name = workspace_config['name'].replace(
             '{{SOLUTION_VERSION}}', solution_version)
@@ -67,6 +54,7 @@ def main():
 
         if not workspace_id:
             print(f"  Warning: Workspace not found: {workspace_name}")
+            failures += 1
             continue
 
         # Update workspace from Git (pull latest from main branch)
@@ -74,8 +62,10 @@ def main():
 
         if not success:
             print(f"  Warning: Failed to update {workspace_name} from Git")
+            failures += 1
 
-    print("\n Dev workspace sync complete")
+    print(f"\n Dev workspace sync complete ({len(dev_workspaces) - failures}/{len(dev_workspaces)} succeeded)")
+    sys.exit(1 if failures else 0)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "fabric-core"
+version = "0.1.0"
+description = "Reusable modules for Microsoft Fabric CLI operations"
+requires-python = ">=3.12"
+
+[tool.setuptools.packages.find]
+include = ["fabric_core*"]

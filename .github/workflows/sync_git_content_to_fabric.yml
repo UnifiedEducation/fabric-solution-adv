@@ -31,7 +31,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: pip install -r config/requirements.txt
+        run: pip install -r config/requirements.txt && pip install -e config/
 
       - name: Sync dev workspaces from main
         run: python config/scripts/sync_dev_workspaces_from_main.py

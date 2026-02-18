@@ -27,8 +27,9 @@ def call_azure_api(endpoint, method='get', body=None):
         cmd.extend(['-i', json.dumps(body)])
     response = run_command(cmd)
     try:
-        return json.loads(response.stdout).get('status_code', 0), json.loads(response.stdout).get('text', {})
-    except:
+        parsed = json.loads(response.stdout)
+        return parsed.get('status_code', 0), parsed.get('text', {})
+    except (json.JSONDecodeError, KeyError):
         return 0, {}
 
 

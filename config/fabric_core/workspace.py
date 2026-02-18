@@ -57,7 +57,7 @@ def create_workspace(workspace_config):
     workspace_id = get_workspace_id(workspace_name)
 
     if not workspace_id:
-        print(f"  Warning: Warning: Workspace created but ID could not be retrieved")
+        print(f"  Warning: Workspace created but ID could not be retrieved")
 
     return workspace_id
 

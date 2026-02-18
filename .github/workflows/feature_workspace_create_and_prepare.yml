@@ -50,7 +50,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: pip install -r config/requirements.txt
+        run: pip install -r config/requirements.txt && pip install -e config/
 
       - name: Create feature workspaces
         run: python config/scripts/create_feature_workspaces.py

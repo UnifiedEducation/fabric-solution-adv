@@ -15,14 +15,8 @@ import sys
 import time
 import argparse
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Add config directory to Python path for fabric_core imports
-config_dir = Path(__file__).parent.parent
-if str(config_dir) not in sys.path:
-    sys.path.insert(0, str(config_dir))
-
-from fabric_core import auth
+from fabric_core import auth, bootstrap
 from fabric_core.capacity import suspend_capacity
 from fabric_core.utils import call_azure_api, load_config
 
@@ -228,14 +222,8 @@ Examples:
 
     args = parser.parse_args()
 
-    # Load environment variables from .env file (for local testing)
-    if not os.getenv('GITHUB_ACTIONS'):
-        env_file = Path(__file__).parent.parent.parent / '.env'
-        if env_file.exists():
-            load_dotenv(env_file)
-            print(f"Loaded environment from: {env_file}")
+    bootstrap()
 
-    # Determine repository root
     repository_root = Path(__file__).parent.parent.parent
 
     # Load configuration

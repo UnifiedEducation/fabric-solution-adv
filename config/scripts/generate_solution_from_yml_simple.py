@@ -6,18 +6,12 @@
 import os
 import sys
 import time
-from pathlib import Path
-from dotenv import load_dotenv
 
-# Add config directory to Python path to find fabric_core module
-config_dir = Path(__file__).parent.parent
-if str(config_dir) not in sys.path:
-    sys.path.insert(0, str(config_dir))
-
-# Import from fabric_core modules
-from fabric_core import auth, create_workspace, assign_permissions
-from fabric_core import get_or_create_git_connection, connect_workspace_to_git
-from fabric_core import create_capacity, suspend_capacity
+from fabric_core import (
+    auth, bootstrap, create_workspace, assign_permissions,
+    get_or_create_git_connection, connect_workspace_to_git,
+    create_capacity, suspend_capacity
+)
 from fabric_core.utils import load_config
 
 # Ensure UTF-8 encoding for stdout to support Unicode characters (like checkmarks)
@@ -26,9 +20,7 @@ if sys.stdout.encoding != 'utf-8':
 
 
 def main():
-    if not os.getenv('GITHUB_ACTIONS'):
-        # Load .env from project root (2 levels up from scripts/)
-        load_dotenv(Path(__file__).parent.parent.parent / '.env')
+    bootstrap()
 
     config = load_config(
         os.getenv('CONFIG_FILE', 'config/templates/v01/v01-template.yml'))

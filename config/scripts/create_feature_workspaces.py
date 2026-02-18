@@ -5,24 +5,14 @@ This script is designed to be called from GitHub Actions workflow_dispatch.
 It creates workspaces for a feature branch and connects them to Git.
 """
 
-# fmt: off
-# isort: skip_file
-import os
-import sys
-from pathlib import Path
-from dotenv import load_dotenv
-
-# Add config directory to Python path to find fabric_core module
-config_dir = Path(__file__).parent.parent
-if str(config_dir) not in sys.path:
-    sys.path.insert(0, str(config_dir))
-
-# Import from fabric_core modules (must be after sys.path modification)
-from fabric_core import auth, create_workspace, assign_permissions
-from fabric_core import get_or_create_git_connection, connect_workspace_to_git, update_workspace_from_git
-from fabric_core.utils import load_config, run_command, get_fabric_cli_path
 import json
-# fmt: on
+import os
+
+from fabric_core import (
+    auth, bootstrap, create_workspace, assign_permissions,
+    get_or_create_git_connection, connect_workspace_to_git, update_workspace_from_git
+)
+from fabric_core.utils import load_config, run_command, get_fabric_cli_path
 
 
 def get_capacity_for_workspace_type(workspace_type, solution_version):
@@ -36,10 +26,7 @@ def get_capacity_for_workspace_type(workspace_type, solution_version):
 
 
 def main():
-    # Load environment variables if not in GitHub Actions
-    if not os.getenv('GITHUB_ACTIONS'):
-        # Load .env from project root (2 levels up from scripts/)
-        load_dotenv(Path(__file__).parent.parent.parent / '.env')
+    bootstrap()
 
     # Get inputs from environment (set by GitHub Actions workflow)
     feature_branch = os.getenv('FEATURE_BRANCH_NAME')
