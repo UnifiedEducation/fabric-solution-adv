@@ -210,6 +210,25 @@ def get_most_recent_file(base_path: str, folder: str):
         raise FileNotFoundError(f"No files found in {full_path}")
     return max(files, key=lambda f: f.modifyTime)
 
+
+def build_source_path(base_path: str, source_path: str) -> str:
+    """
+    Build full source path, normalizing any redundant 'Files/' prefix in metadata paths.
+
+    The metadata source_path may include a 'Files/' prefix that is already
+    part of the base_path (from construct_abfs_path with area='Files').
+
+    Args:
+        base_path: Base ABFS path (already includes Files/ area)
+        source_path: Source path from metadata (may include 'Files/' prefix)
+
+    Returns:
+        Normalized full path
+    """
+    cleaned = source_path.replace("Files/", "", 1) if source_path.startswith("Files/") else source_path
+    return f"{base_path}{cleaned}"
+
+
 def get_api_key_from_keyvault(key_vault_url: str, secret_name: str) -> str:
     """
     Retrieve API key from Azure Key Vault.
@@ -800,6 +819,10 @@ def execute_pipeline_stage(spark, instructions: list, stage_executor,
                             instruction_detail=detail,
                             started_at=start_time
                         )
+                    else:
+                        print(f"  -> WARNING: Log function '{log_meta['function_name']}' not found")
+                else:
+                    print(f"  -> WARNING: log_function_id '{log_func_id}' not found in log_store")
 
         except Exception as e:
             print(f"  -> ERROR: {str(e)}")
@@ -823,6 +846,10 @@ def execute_pipeline_stage(spark, instructions: list, stage_executor,
                             instruction_detail=detail,
                             started_at=start_time
                         )
+                    else:
+                        print(f"  -> WARNING: Could not log failure - function '{log_meta['function_name']}' not found")
+                else:
+                    print(f"  -> WARNING: Could not log failure - log_function_id '{log_func_id}' not found")
             raise
 
 # METADATA ********************

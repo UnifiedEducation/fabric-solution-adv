@@ -17,13 +17,13 @@
 # MARKDOWN ********************
 
 # # nb-av01-4-validate
-# 
+#
 # **Purpose**: Run Great Expectations validations on Gold layer tables.
-# 
+#
 # **Stage**: Gold (validation only)
-# 
+#
 # **Dependencies**: nb-av01-generic-functions
-# 
+#
 # **Metadata**: instructions.validations, metadata.expectation_store
 
 # MARKDOWN ********************
@@ -93,7 +93,7 @@ validation_instructions = get_active_instructions(spark, "validations", layer="g
 
 # CELL ********************
 
-# Create ephemeral GX context for Fabric
+# Create ephemeral GX context for Fabric (no persistent store needed)
 context = gx.get_context(mode="ephemeral")
 
 # Add Spark datasource
@@ -109,13 +109,26 @@ datasource = context.data_sources.add_spark(name="spark_datasource")
 # MARKDOWN ********************
 
 # ## Execute Validations
+#
+# Expected fields in each instruction from `instructions.validations`:
+# - `target_table` (str, required): Table to validate (e.g., 'marketing/channels')
+# - `expectation_id` (int, required): Lookup key in metadata.expectation_store
+# - `column_name` (str, optional): Column to validate
+# - `validation_params` (JSON str, optional): Additional GX expectation parameters
+# - `severity` (str, optional): 'error' or 'warning' (default: 'error')
+# - `validation_instr_id` (int, required): Instruction identifier for logging
+# - `log_function_id` (int, required): Lookup key in metadata.log_store
+# - `pipeline_name` (str, optional): Pipeline name for logging
+# - `notebook_name` (str, optional): Notebook name for logging
 
 # CELL ********************
 
-NOTEBOOK_NAME = "nb-av01-4-validate"
-PIPELINE_NAME = "data_pipeline"
+# Read pipeline/notebook identity from instruction metadata
+first_instr = validation_instructions[0] if validation_instructions else {}
+PIPELINE_NAME = first_instr.get("pipeline_name", "data_pipeline")
+NOTEBOOK_NAME = first_instr.get("notebook_name", "nb-av01-4-validate")
 
-# Group validations by target table
+# Group validations by target table to minimize table reads
 validations_by_table = {}
 for v in validation_instructions:
     table = v["target_table"]
@@ -127,7 +140,6 @@ all_results = {}
 all_passed = True
 
 for table_name, table_validations in validations_by_table.items():
-    # Capture start time for accurate duration tracking
     start_time = datetime.now()
 
     try:
@@ -145,23 +157,26 @@ for table_name, table_validations in validations_by_table.items():
         expectations = []
         for v in table_validations:
             exp_meta = expectation_lookup.get(v["expectation_id"])
-            if exp_meta:
-                # Parse validation params if present
-                params = json.loads(v["validation_params"]) if v.get("validation_params") else {}
+            if not exp_meta:
+                print(f"  -> WARNING: expectation_id {v['expectation_id']} not found in expectation_store, skipping")
+                continue
 
-                # Build expectation using metadata
-                exp = build_expectation(
-                    gx_method=exp_meta["gx_method"],
-                    column_name=v.get("column_name"),
-                    validation_params=params
-                )
-                expectations.append({
-                    "expectation": exp,
-                    "severity": v.get("severity", "error"),
-                    "column": v.get("column_name"),
-                    "expectation_name": exp_meta["expectation_name"],
-                    "validation_instr_id": v["validation_instr_id"]
-                })
+            # Parse validation params if present
+            params = json.loads(v["validation_params"]) if v.get("validation_params") else {}
+
+            # Build expectation using metadata
+            exp = build_expectation(
+                gx_method=exp_meta["gx_method"],
+                column_name=v.get("column_name"),
+                validation_params=params
+            )
+            expectations.append({
+                "expectation": exp,
+                "severity": v.get("severity", "error"),
+                "column": v.get("column_name"),
+                "expectation_name": exp_meta["expectation_name"],
+                "validation_instr_id": v["validation_instr_id"]
+            })
 
         print(f"  -> Running {len(expectations)} expectations")
 
@@ -171,15 +186,15 @@ for table_name, table_validations in validations_by_table.items():
         for e in expectations:
             suite.add_expectation(e["expectation"])
 
-        # Get or create dataframe asset (idempotent)
+        # Get or create dataframe asset (idempotent - reuses if already created)
         asset_name = f"{table_name.replace('/', '_')}_asset"
         try:
             asset = datasource.get_asset(asset_name)
         except LookupError:
             asset = datasource.add_dataframe_asset(name=asset_name)
 
-        # Get or create batch definition (idempotent)
-        batch_def_name = "batch_def"
+        # Get or create batch definition (unique per table to avoid cross-contamination)
+        batch_def_name = f"batch_def_{table_name.replace('/', '_')}"
         try:
             batch_definition = asset.get_batch_definition(batch_def_name)
         except LookupError:
@@ -190,7 +205,7 @@ for table_name, table_validations in validations_by_table.items():
         # Run validation
         validation_result = batch.validate(suite)
 
-        # Add metadata for logging
+        # Add metadata for downstream logging
         validation_result.meta["table_name"] = table_name
         validation_result.meta["validation_instructions"] = expectations
 
@@ -223,7 +238,8 @@ for table_name, table_validations in validations_by_table.items():
             started_at=start_time
         )
 
-        # Log validation results (detailed per-expectation logging)
+        # Log detailed per-expectation results
+        # All validations for a table share the same log_function_id; use the first instruction's
         log_meta = log_lookup.get(table_validations[0]["log_function_id"])
         if log_meta:
             log_func = globals().get(log_meta["function_name"])
@@ -235,6 +251,10 @@ for table_name, table_validations in validations_by_table.items():
                     lakehouse_name=variables.GOLD_LH_NAME,
                     started_at=start_time
                 )
+            else:
+                print(f"  -> WARNING: Log function '{log_meta['function_name']}' not found")
+        else:
+            print(f"  -> WARNING: log_function_id '{table_validations[0]['log_function_id']}' not found in log_store")
 
     except Exception as e:
         print(f"  -> ERROR: {str(e)}")

@@ -6,6 +6,8 @@ CREATE TABLE [instructions].[ingestion] (
     [request_params]  JSON          NULL,
     [is_active]       BIT           DEFAULT ((1)) NULL,
     [log_function_id] INT           NULL,
+    [pipeline_name]   VARCHAR (100) NULL,
+    [notebook_name]   VARCHAR (100) NULL,
     [created_date]    DATETIME2 (7) DEFAULT (getdate()) NULL,
     [modified_date]   DATETIME2 (7) DEFAULT (getdate()) NULL,
     PRIMARY KEY CLUSTERED ([ingestion_id] ASC),

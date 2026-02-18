@@ -22,13 +22,13 @@
 # MARKDOWN ********************
 
 # # nb-av01-3-model
-# 
+#
 # **Purpose**: Transform Silver data to Gold using business modeling rules.
-# 
+#
 # **Stage**: Silver → Gold
-# 
+#
 # **Dependencies**: nb-av01-generic-functions
-# 
+#
 # **Metadata**: instructions.transformations (dest_layer='gold'), metadata.transform_store
 
 # MARKDOWN ********************
@@ -97,96 +97,77 @@ transform_instructions = get_active_instructions(spark, "transformations", layer
 # MARKDOWN ********************
 
 # ## Execute Transformations
+#
+# Expected fields in each instruction from `instructions.transformations`:
+# - `source_table` (str, required): Delta table name in Silver (e.g., 'youtube/channels')
+# - `dest_table` (str, required): Delta table name in Gold
+# - `transform_pipeline` (JSON str, required): Ordered array of transform_id values (e.g., [3, 4])
+# - `transform_params` (JSON str, optional): Parameters keyed by transform_id
+# - `merge_condition` (str, required): SQL MERGE condition
+# - `merge_type` (str, required): 'update_all' or 'specific_columns'
+# - `merge_columns` (JSON str, optional): Column lists for specific_columns merge
+# - `log_function_id` (int, required): Lookup key in metadata.log_store
+# - `pipeline_name` (str, optional): Pipeline name for logging
+# - `notebook_name` (str, optional): Notebook name for logging
 
 # CELL ********************
 
-NOTEBOOK_NAME = "nb-av01-3-model"
-PIPELINE_NAME = "data_pipeline"
+# Read pipeline/notebook identity from instruction metadata
+first_instr = transform_instructions[0] if transform_instructions else {}
+PIPELINE_NAME = first_instr.get("pipeline_name", "data_pipeline")
+NOTEBOOK_NAME = first_instr.get("notebook_name", "nb-av01-3-model")
 
-for instr in transform_instructions:
-    start_time = datetime.now()
 
-    try:
-        # Build paths using pre-built base paths
-        source_path = SILVER_BASE_PATH + instr["source_table"]
-        dest_path = GOLD_BASE_PATH + instr["dest_table"]
+def model_executor(spark, instr):
+    """Execute a single modeling/transform instruction. Returns (row_count, source_name, detail)."""
+    source_path = SILVER_BASE_PATH + instr["source_table"]
+    dest_path = GOLD_BASE_PATH + instr["dest_table"]
 
-        print(f"Modeling: {instr['source_table']} -> {instr['dest_table']}")
+    print(f"Modeling: {instr['source_table']} -> {instr['dest_table']}")
 
-        # Read source data
-        df = spark.read.format("delta").load(source_path)
-        print(f"  -> Read {df.count()} rows from source")
+    df = spark.read.format("delta").load(source_path)
 
-        # Parse transform pipeline and params from JSON
-        pipeline = json.loads(instr["transform_pipeline"])
-        params = json.loads(instr["transform_params"]) if instr.get("transform_params") else {}
+    # Parse transform pipeline (ordered list of transform_ids) and params
+    pipeline = json.loads(instr["transform_pipeline"])
+    params = json.loads(instr["transform_params"]) if instr.get("transform_params") else {}
 
-        # Execute transform pipeline using metadata lookup
-        result_df = execute_transform_pipeline(
-            spark=spark,
-            df=df,
-            pipeline=pipeline,
-            params=params,
-            transform_lookup=transform_lookup,
-            dest_base_path=GOLD_BASE_PATH
-        )
+    # dest_base_path needed by transforms like generate_surrogate_key and lookup_join
+    result_df = execute_transform_pipeline(
+        spark=spark,
+        df=df,
+        pipeline=pipeline,
+        params=params,
+        transform_lookup=transform_lookup,
+        dest_base_path=GOLD_BASE_PATH
+    )
 
-        row_count = result_df.count()
-        print(f"  -> Transformed to {row_count} rows")
+    merge_columns = json.loads(instr["merge_columns"]) if instr.get("merge_columns") else None
 
-        # Parse merge columns if present
-        merge_columns = json.loads(instr["merge_columns"]) if instr.get("merge_columns") else None
+    if not instr.get("merge_type"):
+        raise ValueError(f"merge_type is required in transformation instruction for {instr['dest_table']}")
 
-        # Merge to destination
-        merge_to_delta(
-            spark=spark,
-            source_df=result_df,
-            target_path=dest_path,
-            merge_condition=instr["merge_condition"],
-            merge_type=instr.get("merge_type", "update_all"),
-            merge_columns=merge_columns
-        )
+    row_count = merge_to_delta(
+        spark=spark,
+        source_df=result_df,
+        target_path=dest_path,
+        merge_condition=instr["merge_condition"],
+        merge_type=instr["merge_type"],
+        merge_columns=merge_columns
+    )
 
-        print(f"  -> Merged to {instr['dest_table']}")
+    print(f"  -> Merged to {instr['dest_table']}")
+    return (row_count, instr["source_table"], instr["dest_table"])
 
-        # Log success using metadata-driven function lookup
-        log_meta = log_lookup.get(instr["log_function_id"])
-        if log_meta:
-            log_func = globals().get(log_meta["function_name"])
-            if log_func:
-                log_func(
-                    spark=spark,
-                    pipeline_name=PIPELINE_NAME,
-                    notebook_name=NOTEBOOK_NAME,
-                    status=STATUS_SUCCESS,
-                    rows_processed=row_count,
-                    action_type=ACTION_TRANSFORMATION,
-                    source_name=instr["source_table"],
-                    instruction_detail=instr["dest_table"],
-                    started_at=start_time
-                )
 
-    except Exception as e:
-        print(f"  -> ERROR: {str(e)}")
-
-        # Log failure using metadata-driven function lookup
-        log_meta = log_lookup.get(instr["log_function_id"])
-        if log_meta:
-            log_func = globals().get(log_meta["function_name"])
-            if log_func:
-                log_func(
-                    spark=spark,
-                    pipeline_name=PIPELINE_NAME,
-                    notebook_name=NOTEBOOK_NAME,
-                    status=STATUS_FAILED,
-                    rows_processed=0,
-                    error_message=str(e),
-                    action_type=ACTION_TRANSFORMATION,
-                    source_name=instr["source_table"],
-                    instruction_detail=instr["dest_table"],
-                    started_at=start_time
-                )
-        raise
+execute_pipeline_stage(
+    spark=spark,
+    instructions=transform_instructions,
+    stage_executor=model_executor,
+    notebook_name=NOTEBOOK_NAME,
+    pipeline_name=PIPELINE_NAME,
+    action_type=ACTION_TRANSFORMATION,
+    log_lookup=log_lookup
+)
 
 # METADATA ********************
 
