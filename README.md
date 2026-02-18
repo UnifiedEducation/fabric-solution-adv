@@ -5,7 +5,7 @@
 [![Deploy to TEST](https://github.com/UnifiedEducation/fabric-solution-adv/actions/workflows/deploy-to-test.yml/badge.svg)](https://github.com/UnifiedEducation/fabric-solution-adv/actions/workflows/deploy-to-test.yml)
 [![Deploy to PROD](https://github.com/UnifiedEducation/fabric-solution-adv/actions/workflows/deploy-to-prod.yml/badge.svg)](https://github.com/UnifiedEducation/fabric-solution-adv/actions/workflows/deploy-to-prod.yml)
 
-The Advanced real-world Fabric Data Platform built at [Fabric Dojo](https://skool.com/fabricdojo).
+The Advanced real-world Fabric Data Platform built at [Fabric Dojo](https://skool.com/fabricdojo/about).
 
 _'Advanced'_ - meaning it's designed for teams with Data Platform experience looking to implement enterprise-grade patterns including Infrastructure-as-Code, metadata-driven pipelines, and comprehensive CI/CD automation. If you're transitioning from Power BI-centric architectures, the [Intermediate-level project](https://github.com/UnifiedEducation/fabric-solution-int) will be best for you.
 
