@@ -54,10 +54,9 @@
 
 # ## Configuration
 
-# CELL ********************
+# PARAMETERS CELL ********************
 
-# Parameters - can be passed via REST API execution
-# These are optional; if not provided, notebookutils.credentials.getSecret() is used (requires user credentials)
+# Parameters - passed via REST API execution
 spn_tenant_id = ""
 spn_client_id = ""
 spn_client_secret = ""
@@ -148,94 +147,34 @@ NOTEBOOK_NAME = first_instr.get("notebook_name", "nb-av01-0-ingest-api")
 # (e.g., /videos endpoint needs data from /playlistItems endpoint)
 ingestion_context = {}
 
-for instr in ingestion_instructions:
-    start_time = datetime.now()
-    source_meta = None
 
-    try:
-        # Resolve source metadata
-        source_meta = source_lookup.get(instr["source_id"])
-        if not source_meta:
-            raise ValueError(f"Source ID {instr['source_id']} not found in source_store")
+def ingest_executor(spark, instr):
+    """Execute a single ingestion instruction. Returns (row_count, source_name, detail)."""
+    source_meta = source_lookup.get(instr["source_id"])
+    if not source_meta:
+        raise ValueError(f"Source ID {instr['source_id']} not found in source_store")
 
-        print(f"Ingesting: {source_meta['source_name']}{instr['endpoint_path']}")
+    print(f"Ingesting: {source_meta['source_name']}{instr['endpoint_path']}")
 
-        # Get API key from Key Vault
-        api_key = get_api_key_from_keyvault(
-            source_meta["key_vault_url"],
-            source_meta["secret_name"]
-        )
+    api_key = get_api_key_from_keyvault(source_meta["key_vault_url"], source_meta["secret_name"])
+    handler_func = resolve_ingestion_handler(source_meta)
+    items = handler_func(source_meta, instr, api_key, ingestion_context)
 
-        # Dispatch to handler function defined in source metadata
-        handler_name = source_meta.get("handler_function")
-        if not handler_name:
-            raise ValueError(f"No handler_function defined for source '{source_meta['source_name']}'")
+    item_count = write_to_landing_zone(items, RAW_BASE_PATH, instr["landing_path"])
+    print(f"  -> Saved {item_count} items to {instr['landing_path']}")
 
-        handler_func = globals().get(handler_name)
-        if not handler_func:
-            raise ValueError(f"Handler function '{handler_name}' not found")
+    return (item_count, source_meta["source_name"], instr["endpoint_path"])
 
-        items = handler_func(source_meta, instr, api_key, ingestion_context)
 
-        # Save to landing zone
-        item_count = len(items)
-        output_path = f"{RAW_BASE_PATH}{instr['landing_path']}"
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_path = f"{output_path}{timestamp}.json"
-
-        # Wrap multiple items in {"items": [...]} for consistent downstream parsing
-        output_data = {"items": items} if item_count > 1 else (items[0] if items else {})
-        json_content = json.dumps(output_data, indent=2)
-        notebookutils.fs.put(file_path, json_content, overwrite=True)
-
-        print(f"  -> Saved {item_count} items to {instr['landing_path']}")
-
-        # Log success
-        log_meta = log_lookup.get(instr["log_function_id"])
-        if log_meta:
-            log_func = globals().get(log_meta["function_name"])
-            if log_func:
-                log_func(
-                    spark=spark,
-                    pipeline_name=PIPELINE_NAME,
-                    notebook_name=NOTEBOOK_NAME,
-                    status=STATUS_SUCCESS,
-                    rows_processed=item_count,
-                    action_type=ACTION_INGESTION,
-                    source_name=source_meta["source_name"],
-                    instruction_detail=instr["endpoint_path"],
-                    started_at=start_time
-                )
-            else:
-                print(f"  -> WARNING: Log function '{log_meta['function_name']}' not found")
-        else:
-            print(f"  -> WARNING: log_function_id '{instr['log_function_id']}' not found in log_store")
-
-    except Exception as e:
-        print(f"  -> ERROR: {str(e)}")
-
-        # Log failure
-        log_meta = log_lookup.get(instr.get("log_function_id"))
-        if log_meta:
-            log_func = globals().get(log_meta["function_name"])
-            if log_func:
-                log_func(
-                    spark=spark,
-                    pipeline_name=PIPELINE_NAME,
-                    notebook_name=NOTEBOOK_NAME,
-                    status=STATUS_FAILED,
-                    rows_processed=0,
-                    error_message=str(e),
-                    action_type=ACTION_INGESTION,
-                    source_name=source_meta["source_name"] if source_meta else None,
-                    instruction_detail=instr.get("endpoint_path"),
-                    started_at=start_time
-                )
-            else:
-                print(f"  -> WARNING: Could not log failure - log function not found")
-        else:
-            print(f"  -> WARNING: Could not log failure - log_function_id not found")
-        raise
+execute_pipeline_stage(
+    spark=spark,
+    instructions=ingestion_instructions,
+    stage_executor=ingest_executor,
+    notebook_name=NOTEBOOK_NAME,
+    pipeline_name=PIPELINE_NAME,
+    action_type=ACTION_INGESTION,
+    log_lookup=log_lookup
+)
 
 # METADATA ********************
 

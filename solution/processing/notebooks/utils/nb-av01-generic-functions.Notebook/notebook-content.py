@@ -229,6 +229,57 @@ def build_source_path(base_path: str, source_path: str) -> str:
     return f"{base_path}{cleaned}"
 
 
+def write_to_landing_zone(items: list, base_path: str, landing_path: str) -> int:
+    """
+    Write API response items to the raw landing zone as a timestamped JSON file.
+
+    Wraps multiple items in {"items": [...]} for consistent downstream parsing
+    by load_json_to_delta. Single items are written unwrapped.
+
+    Args:
+        items: List of items from API response
+        base_path: Base ABFS path for landing zone (Files area)
+        landing_path: Subfolder path within landing zone
+
+    Returns:
+        Number of items written
+    """
+    item_count = len(items)
+    output_path = f"{base_path}{landing_path}"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_path = f"{output_path}{timestamp}.json"
+
+    output_data = {"items": items} if item_count > 1 else (items[0] if items else {})
+    json_content = json.dumps(output_data, indent=2)
+    notebookutils.fs.put(file_path, json_content, overwrite=True)
+
+    return item_count
+
+
+def resolve_ingestion_handler(source_meta: dict):
+    """
+    Resolve the ingestion handler function from source metadata.
+
+    Args:
+        source_meta: Source metadata dict (must contain 'handler_function')
+
+    Returns:
+        Callable handler function
+
+    Raises:
+        ValueError: If handler_function is missing or not found
+    """
+    handler_name = source_meta.get("handler_function")
+    if not handler_name:
+        raise ValueError(f"No handler_function defined for source '{source_meta.get('source_name')}'")
+
+    handler_func = globals().get(handler_name)
+    if not handler_func:
+        raise ValueError(f"Handler function '{handler_name}' not found")
+
+    return handler_func
+
+
 def get_api_key_from_keyvault(key_vault_url: str, secret_name: str) -> str:
     """
     Retrieve API key from Azure Key Vault.
