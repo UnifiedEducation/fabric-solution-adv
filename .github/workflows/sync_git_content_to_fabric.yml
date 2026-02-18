@@ -1,4 +1,4 @@
-name: Sync Dev Workspaces from Main
+name: Sync to DEV Environment
 
 on:
   pull_request:
